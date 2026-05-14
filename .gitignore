@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# Test / lint cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# AI models — never commit (multi-GB)
+models/mediapipe/*.task
+models/mediapipe/*.tflite
+models/qwen/*.gguf
+models/qwen/*.bin
+models/whisper/
+models/piper/
+
+# Runtime data
+/home/maker/makervigate/
+photos/
+sessions/
+*.log
+/var/log/makervigate/
+
+# OS
+Thumbs.db
+desktop.ini
+
+# Vision fixtures (ghi clip test — không commit cá nhân)
+tests/fixtures/*.mp4
+tests/fixtures/*.mov
+
+# Config user override
+~/.config/makervigate/
+*.local.toml

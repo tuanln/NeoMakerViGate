@@ -1,0 +1,52 @@
+[app]
+name = "NeoMakerViGate"
+version = "0.1.0"
+language = "vi"
+debug = false
+idle_timeout_seconds = 90
+
+[vision]
+webcam_index = 0
+resolution_width = 1280
+resolution_height = 720
+target_fps = 15
+pose_model_complexity = 1
+max_num_hands = 2
+auto_retry_count = 3
+
+[qwen]
+mode = "auto"
+local_model_path = "models/qwen/qwen3.5-0.8b-q4.gguf"
+api_endpoint = "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation"
+api_model = "qwen-vl-plus"
+api_timeout_seconds = 8
+caption_enabled = true
+caption_max_words = 40
+
+[experiences]
+enabled = [
+    "exp01_wave_cricket",
+    "exp03_yoga_robot",
+    "exp06_photo_booth",
+]
+default_experience = ""
+
+[storage]
+photos_dir = "~/makervigate/photos"
+sessions_dir = "~/makervigate/sessions"
+max_photos = 200
+auto_cleanup_threshold_mb = 200
+
+[server]
+http_port = 8000
+qr_size = 400
+wifi_ssid = ""
+wifi_password = ""
+
+[ui]
+fullscreen = false
+window_width = 1920
+window_height = 1080
+font_family = "Be Vietnam Pro"
+sound_enabled = true
+show_skeleton_overlay = true

@@ -1,0 +1,22 @@
+# Runtime deps cho NEO One / Raspberry Pi (Ubuntu 22.04 ARM64 / Armbian Bookworm)
+# Pin riêng vì:
+#   - mediapipe ARM64 chỉ có wheel ở một số version cụ thể
+#   - opencv-python trên ARM nên dùng opencv-python-headless để tránh xung đột Qt6
+#   - PyQt6 trên ARM: cài qua apt (python3-pyqt6) tốt hơn pip
+#
+# Cài trên NEO One:
+#   sudo apt install -y python3-pyqt6 python3-pyqt6.qtmultimedia python3-pyqt6.qtquick
+#   python3 -m pip install -r requirements-arm64.txt
+#
+# Hoặc dùng deployment/install-armbian.sh (Phase 7)
+
+mediapipe==0.10.18                   # verify ARM64 wheel có sẵn — fallback compile from source nếu thiếu
+opencv-python-headless==4.10.0.84    # không kèm Qt deps để tránh xung đột
+numpy==1.26.4
+Pillow==10.4.0
+qrcode[pil]==7.4.2
+loguru==0.7.2
+requests==2.32.3
+
+# Qwen local — tùy chọn, install riêng khi cần:
+# pip install llama-cpp-python==0.3.1 --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
