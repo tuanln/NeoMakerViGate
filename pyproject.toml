@@ -115,6 +115,11 @@ plugins = []
 module = ["mediapipe.*", "cv2.*", "qrcode.*", "PyQt6.*"]
 ignore_missing_imports = true
 
+# pyqtProperty decorator chưa có type stub đầy đủ — disable strict cho service layer
+[[tool.mypy.overrides]]
+module = "neo_makervigate.services.app_controller"
+disable_error_code = ["misc", "untyped-decorator"]
+
 [tool.pytest.ini_options]
 minversion = "7.4"
 testpaths = ["tests"]

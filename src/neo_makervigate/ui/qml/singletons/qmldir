@@ -1,2 +1,3 @@
 module NeoMakerViGate.Singletons
 singleton NeoConstants 1.0 NeoConstants.qml
+singleton VisionState 1.0 VisionState.qml
