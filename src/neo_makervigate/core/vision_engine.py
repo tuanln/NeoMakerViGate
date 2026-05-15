@@ -9,6 +9,7 @@ trên NEO One 2GB không chạy nổi cả 4 module cùng lúc.
 
 from __future__ import annotations
 
+import threading
 import time
 import urllib.request
 from datetime import datetime
@@ -105,101 +106,120 @@ class VisionEngine:
         self._detectors: dict[str, object] = {}
         self._active: list[str] = []
         self._clock_start: float = 0.0
+        # RLock bảo vệ _cap/_detectors/_active. Main thread gọi
+        # set_active_modules() và stop() trong khi worker thread chạy read().
+        # Race trước đây: pop("hands") trước khi update _active gây KeyError
+        # trong read() khi check "hands" in _active → True nhưng dict đã rỗng.
+        self._lock = threading.RLock()
 
     # ---- VisionSource Protocol ----
 
     def start(self) -> None:
         """Mở webcam. Module được kích hoạt riêng qua set_active_modules()."""
-        if self._cap is not None:
-            return
-        cap = cv2.VideoCapture(self._webcam_index)
-        if not cap.isOpened():
-            raise RuntimeError(f"Không mở được webcam index {self._webcam_index}")
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, self._width)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self._height)
-        self._cap = cap
-        self._clock_start = time.perf_counter()
-        actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        logger.info(
-            f"Webcam opened: {actual_w}x{actual_h} (requested {self._width}x{self._height})"
-        )
+        with self._lock:
+            if self._cap is not None:
+                return
+            cap = cv2.VideoCapture(self._webcam_index)
+            if not cap.isOpened():
+                raise RuntimeError(f"Không mở được webcam index {self._webcam_index}")
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, self._width)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self._height)
+            self._cap = cap
+            self._clock_start = time.perf_counter()
+            actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            logger.info(
+                f"Webcam opened: {actual_w}x{actual_h} (requested {self._width}x{self._height})"
+            )
 
     def stop(self) -> None:
-        if self._cap is not None:
-            self._cap.release()
-            self._cap = None
-        for det in self._detectors.values():
-            close = getattr(det, "close", None)
-            if close is not None:
-                close()
-        self._detectors.clear()
-        self._active = []
-
-    def set_active_modules(self, modules: list[str]) -> None:
-        """Đóng module không cần, mở module cần. An toàn gọi nhiều lần."""
-        new_set = set(modules)
-        old_set = set(self._active)
-
-        # Đóng module bỏ
-        for name in old_set - new_set:
-            det = self._detectors.pop(name, None)
-            if det is not None:
+        with self._lock:
+            if self._cap is not None:
+                self._cap.release()
+                self._cap = None
+            # Update _active trước khi close detectors để giữ invariant
+            # "name in _active ⇒ name in _detectors" cho mọi reader.
+            self._active = []
+            for det in self._detectors.values():
                 close = getattr(det, "close", None)
                 if close is not None:
                     close()
-                logger.debug(f"Closed module: {name}")
+            self._detectors.clear()
 
-        # Mở module mới
-        for name in new_set - old_set:
-            self._detectors[name] = self._create_detector(name)
-            logger.debug(f"Opened module: {name}")
+    def set_active_modules(self, modules: list[str]) -> None:
+        """Đóng module không cần, mở module cần. An toàn gọi nhiều lần.
 
-        self._active = list(modules)
+        Thứ tự thao tác giữ invariant `name in _active ⇒ name in _detectors`:
+          1) tạo detector mới (additions)
+          2) cập nhật _active = modules
+          3) đóng detector cũ (removals)
+        """
+        with self._lock:
+            new_set = set(modules)
+            old_set = set(self._active)
+
+            # 1) Mở module mới TRƯỚC khi expose qua _active
+            for name in new_set - old_set:
+                self._detectors[name] = self._create_detector(name)
+                logger.debug(f"Opened module: {name}")
+
+            # 2) Update _active — sau bước này reader chỉ thấy module hợp lệ
+            self._active = list(modules)
+
+            # 3) Đóng module bỏ — sau khi reader đã không còn check tên đó
+            for name in old_set - new_set:
+                det = self._detectors.pop(name, None)
+                if det is not None:
+                    close = getattr(det, "close", None)
+                    if close is not None:
+                        close()
+                    logger.debug(f"Closed module: {name}")
 
     def read(self) -> tuple[bool, np.ndarray[Any, Any] | None, VisionFrame | None]:
-        """Đọc 1 khung hình + chạy mọi module active. Trả về (ok, bgr_frame, VisionFrame)."""
-        if self._cap is None:
-            return False, None, None
-        ret, frame_bgr = self._cap.read()
-        if not ret or frame_bgr is None:
-            return False, None, None
+        """Đọc 1 khung hình + chạy mọi module active. Trả về (ok, bgr_frame, VisionFrame).
 
-        ts_ms = int((time.perf_counter() - self._clock_start) * 1000)
-        h, w = frame_bgr.shape[:2]
-        rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+        Toàn bộ phương thức chạy dưới `_lock` để loại race với set_active_modules()
+        và stop() từ thread khác. MediaPipe inference ~30ms — main thread gọi
+        set_active_modules sẽ đợi tối đa 1 frame, chấp nhận được.
+        """
+        with self._lock:
+            if self._cap is None:
+                return False, None, None
+            ret, frame_bgr = self._cap.read()
+            if not ret or frame_bgr is None:
+                return False, None, None
 
-        vf = VisionFrame(timestamp=datetime.now(), width=w, height=h)
+            ts_ms = int((time.perf_counter() - self._clock_start) * 1000)
+            h, w = frame_bgr.shape[:2]
+            rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
 
-        if "hands" in self._active:
-            detector = self._detectors["hands"]
-            result = detector.detect_for_video(mp_image, ts_ms)  # type: ignore[attr-defined]
-            if result.hand_landmarks:
-                vf.hands = [
-                    [Landmark(x=lm.x, y=lm.y, z=lm.z) for lm in hand]
-                    for hand in result.hand_landmarks
-                ]
-                vf.has_person = True
+            vf = VisionFrame(timestamp=datetime.now(), width=w, height=h)
 
-        if "pose" in self._active:
-            detector = self._detectors["pose"]
-            result = detector.detect_for_video(mp_image, ts_ms)  # type: ignore[attr-defined]
-            if result.pose_landmarks:
-                vf.pose = [
-                    Landmark(x=lm.x, y=lm.y, z=lm.z, visibility=lm.visibility)
-                    for lm in result.pose_landmarks[0]
-                ]
-                vf.has_person = True
+            for name in self._active:
+                detector = self._detectors.get(name)
+                if detector is None:
+                    continue
+                result = detector.detect_for_video(mp_image, ts_ms)  # type: ignore[attr-defined]
+                if name == "hands" and result.hand_landmarks:
+                    vf.hands = [
+                        [Landmark(x=lm.x, y=lm.y, z=lm.z) for lm in hand]
+                        for hand in result.hand_landmarks
+                    ]
+                    vf.has_person = True
+                elif name == "pose" and result.pose_landmarks:
+                    vf.pose = [
+                        Landmark(x=lm.x, y=lm.y, z=lm.z, visibility=lm.visibility)
+                        for lm in result.pose_landmarks[0]
+                    ]
+                    vf.has_person = True
+                elif name == "face" and result.face_landmarks:
+                    vf.face = [
+                        Landmark(x=lm.x, y=lm.y, z=lm.z) for lm in result.face_landmarks[0]
+                    ]
+                    vf.has_person = True
 
-        if "face" in self._active:
-            detector = self._detectors["face"]
-            result = detector.detect_for_video(mp_image, ts_ms)  # type: ignore[attr-defined]
-            if result.face_landmarks:
-                vf.face = [Landmark(x=lm.x, y=lm.y, z=lm.z) for lm in result.face_landmarks[0]]
-                vf.has_person = True
-
-        return True, frame_bgr, vf
+            return True, frame_bgr, vf
 
     # ---- Internal ----
 
