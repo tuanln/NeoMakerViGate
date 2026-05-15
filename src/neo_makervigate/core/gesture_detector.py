@@ -10,7 +10,6 @@ Tách dual-path (return + emit) để test gọi `feed()` trực tiếp không c
 
 from __future__ import annotations
 
-import time
 from collections import deque
 
 from loguru import logger
@@ -34,7 +33,7 @@ class GestureDetector:
         self._window = window_seconds
         self._buffer: deque[tuple[float, float]] = deque(maxlen=BUFFER_MAXLEN)
         self._cooldown_until: float = 0.0
-        self._none_count = 0
+        self._none_count: int = 0
 
     def feed(self, frame: VisionFrame) -> list[str]:
         """Cho ăn 1 frame. Trả về list gesture mới phát hiện trong frame này."""
@@ -89,5 +88,3 @@ class GestureDetector:
         self._buffer.clear()
         self._cooldown_until = 0.0
         self._none_count = 0
-        # Workaround mypy: dùng time để tránh "unused import"
-        _ = time

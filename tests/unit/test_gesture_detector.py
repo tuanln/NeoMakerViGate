@@ -5,8 +5,6 @@ from __future__ import annotations
 import math
 from datetime import datetime, timedelta
 
-import pytest
-
 from neo_makervigate.core.gesture_detector import GestureDetector
 from neo_makervigate.core.models import Landmark, VisionFrame
 
