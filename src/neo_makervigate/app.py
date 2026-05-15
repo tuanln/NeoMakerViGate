@@ -27,7 +27,9 @@ from neo_makervigate.config.settings import load_settings
 from neo_makervigate.core.vision_engine import VisionEngine, VisionSource
 from neo_makervigate.core.vision_simulator import VisionSimulator
 from neo_makervigate.core.vision_worker import VisionWorker
+from neo_makervigate.experiences.registry import discover_experiences
 from neo_makervigate.services.app_controller import AppController
+from neo_makervigate.services.experience_manager import ExperienceManager
 from neo_makervigate.ui.image_provider import CameraImageProvider
 from neo_makervigate.utils.logging_config import setup_logging
 from neo_makervigate.utils.signal_bus import SignalBus
@@ -65,7 +67,12 @@ def run(argv: list[str]) -> int:
     source = _create_vision_source(settings.vision_source)
     worker = VisionWorker(source, initial_modules=["hands"])
 
-    controller = AppController()
+    # Experience plugin registry + manager
+    registry = discover_experiences()
+    logger.info(f"Discovered {len(registry)} experience plugin(s): {list(registry.keys())}")
+    exp_manager = ExperienceManager(registry=registry, worker=worker)
+
+    controller = AppController(experience_manager=exp_manager)
 
     engine = QQmlApplicationEngine()
     engine.addImportPath(str(QML_ROOT))
@@ -90,6 +97,7 @@ def run(argv: list[str]) -> int:
     exit_code = app.exec()
 
     logger.info("Shutting down: stopping VisionWorker")
+    exp_manager.unload()
     worker.stop()
     return exit_code
 

@@ -1,46 +1,74 @@
-"""Experience Protocol — interface mọi trải nghiệm phải implement.
+"""Experience Protocol + BaseExperience helper.
 
-Phase 0 chỉ khai báo Protocol. Phase 2 sẽ implement registry + stub plugins.
-Phase 3+ implement từng game.
+Pattern:
+- `Experience` Protocol: contract bắt buộc — ExperienceManager type-check qua isinstance().
+- `BaseExperience` abstract class: tiện kế thừa cho plugin viết nhanh — no-op default cho hầu hết method, chỉ cần override on_vision_frame + meta.
+
+Plugin format: thư mục `exp*/logic.py` export biến `EXPERIENCE = SomeExperience`.
 """
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from abc import ABC, abstractmethod
+from typing import ClassVar, Protocol, runtime_checkable
 
 from neo_makervigate.core.models import ExperienceMeta, VisionFrame
 
 
 @runtime_checkable
 class Experience(Protocol):
-    """Interface trải nghiệm. Mỗi plugin export biến `EXPERIENCE` là class implement này."""
+    """Contract mọi trải nghiệm phải tuân thủ."""
 
     meta: ExperienceMeta
 
-    def on_enter(self) -> None:
-        """Khởi tạo state, nạp asset. Gọi 1 lần khi vào trải nghiệm."""
-        ...
+    def on_enter(self) -> None: ...
+    def on_vision_frame(self, frame: VisionFrame) -> None: ...
+    def on_gesture(self, gesture: str) -> None: ...
+    def on_qwen_response(self, text: str) -> None: ...
+    def render_state(self) -> dict[str, object]: ...
+    def get_qml_path(self) -> str: ...
+    def on_exit(self) -> None: ...
+
+
+class BaseExperience(ABC):
+    """Helper class cho plugin tiện kế thừa.
+
+    Mặc định mọi callback là no-op trừ `meta` (bắt buộc define).
+    Plugin chỉ cần override những method thực sự dùng (vd `on_vision_frame`).
+    """
+
+    # Plugin override
+    meta: ClassVar[ExperienceMeta]
+
+    def __init__(self) -> None:
+        if not hasattr(self.__class__, "meta"):
+            raise TypeError(
+                f"{self.__class__.__name__} thiếu class attribute 'meta: ExperienceMeta'"
+            )
+
+    @abstractmethod
+    def get_qml_path(self) -> str:
+        """Plugin phải override để trỏ tới ui.qml của mình."""
+        raise NotImplementedError
+
+    def on_enter(self) -> None:  # noqa: B027 — intentional default no-op
+        """Mặc định no-op. Override để load asset."""
+
+    def on_exit(self) -> None:  # noqa: B027 — intentional default no-op
+        """Mặc định no-op. Override để dọn dẹp."""
 
     def on_vision_frame(self, frame: VisionFrame) -> None:
-        """Nhận landmarks mỗi khung hình (~15-30fps). Cập nhật game state."""
-        ...
+        """Mặc định no-op. Override để cập nhật state từ landmarks."""
+        _ = frame
 
     def on_gesture(self, gesture: str) -> None:
-        """Nhận sự kiện cử chỉ rời rạc (WAVE, V_SIGN...)."""
-        ...
+        """Mặc định no-op. Override để phản ứng cử chỉ (WAVE, V_SIGN...)."""
+        _ = gesture
 
     def on_qwen_response(self, text: str) -> None:
-        """Nhận kết quả từ Qwen (chỉ trải nghiệm needs_qwen=True)."""
-        ...
+        """Mặc định no-op. Override nếu meta.needs_qwen=True."""
+        _ = text
 
     def render_state(self) -> dict[str, object]:
-        """Trả về state hiện tại để đẩy lên QML (score, vị trí sprite...)."""
-        ...
-
-    def get_qml_path(self) -> str:
-        """Đường dẫn file ui.qml của trải nghiệm này."""
-        ...
-
-    def on_exit(self) -> None:
-        """Dọn dẹp khi rời trải nghiệm. Giải phóng asset."""
-        ...
+        """Mặc định trả dict rỗng. Override để đẩy state lên QML."""
+        return {}

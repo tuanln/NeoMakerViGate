@@ -20,12 +20,28 @@ ApplicationWindow {
     Component {
         id: splashComponent
         SplashScreen {
-            onSplashDone: stack.replace(visionTestComponent)
+            onSplashDone: stack.replace(hubComponent)
         }
     }
 
     Component {
-        id: visionTestComponent
-        VisionTestPage {}
+        id: hubComponent
+        ExperienceHubPage {
+            onExperienceChosen: function(id) {
+                if (app.selectExperience(id)) {
+                    stack.push(containerComponent)
+                }
+            }
+        }
+    }
+
+    Component {
+        id: containerComponent
+        ExperienceContainerPage {
+            onBackRequested: {
+                app.exitExperience()
+                stack.pop()
+            }
+        }
     }
 }
