@@ -159,3 +159,79 @@ def test_non_wave_gesture_ignored(
     state: dict[str, Any] = exp.render_state()
     assert state["crickets"] == []
     assert state["score"] == 0
+
+
+def test_cricket_position_updates_with_velocity() -> None:
+    """Cricket bay lên do vy âm — y giảm sau khi tiến thời gian."""
+    import random as _r
+    clock = _FakeClock(0.0)
+    exp = WaveCricketExperience(clock=clock, rng=_r.Random(42))
+    exp.on_enter()
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_frame(wrist_x=0.5, wrist_y=0.8))
+    exp.on_gesture("WAVE")
+    state_before = exp.render_state()
+    before_crickets = cast(list[dict[str, Any]], state_before["crickets"])
+    assert len(before_crickets) == 1
+    before_y = cast(float, before_crickets[0]["y"])
+    # Advance 0.5s — y giảm (vy âm)
+    clock.advance(0.5)
+    exp.on_vision_frame(_make_frame(wrist_x=0.5, wrist_y=0.8))
+    state_after = exp.render_state()
+    after_crickets = cast(list[dict[str, Any]], state_after["crickets"])
+    after_y = cast(float, after_crickets[0]["y"])
+    assert after_y < before_y, "Cricket should rise (vy negative)"
+
+
+def test_cricket_despawns_when_out_of_top_and_scores() -> None:
+    """Cricket bay khỏi top (y < -0.1) → despawn + score tăng."""
+    import random as _r
+    clock = _FakeClock(0.0)
+    exp = WaveCricketExperience(clock=clock, rng=_r.Random(42))
+    exp.on_enter()
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_frame(wrist_x=0.5, wrist_y=0.1))
+    exp.on_gesture("WAVE")
+    state = exp.render_state()
+    crickets = cast(list[dict[str, Any]], state["crickets"])
+    assert len(crickets) == 1
+    # Advance đủ để cricket bay khỏi top (vy in [-0.7, -0.5], y=0.1 → ~ 0.2/0.5 = 0.4s tối thiểu).
+    # Advance 2s an toàn.
+    clock.advance(2.0)
+    exp.on_vision_frame(_make_frame(wrist_x=0.5, wrist_y=0.1))
+    state = exp.render_state()
+    crickets = cast(list[dict[str, Any]], state["crickets"])
+    assert crickets == []
+    score = cast(int, state["score"])
+    crickets_flown = cast(int, state["crickets_flown"])
+    assert crickets_flown == 1
+    assert score >= 10  # base 10 (no bonus)
+
+
+def test_cricket_despawns_after_max_age_without_score() -> None:
+    """Cricket sống quá CRICKET_MAX_AGE (4s) → despawn nhưng không tính score."""
+    clock = _FakeClock(0.0)
+    # RNG zero velocity → cricket đứng yên, không bay khỏi top → trigger age despawn
+    class _StaticRng:
+        def uniform(self, a: float, b: float) -> float:
+            return 0.0
+
+    exp = WaveCricketExperience(clock=clock, rng=cast(Any, _StaticRng()))
+    exp.on_enter()
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_frame(wrist_x=0.5, wrist_y=0.5))
+    exp.on_gesture("WAVE")
+    state = exp.render_state()
+    crickets = cast(list[dict[str, Any]], state["crickets"])
+    assert len(crickets) == 1
+    # Advance > 4s
+    clock.advance(4.5)
+    exp.on_vision_frame(_make_frame(wrist_x=0.5, wrist_y=0.5))
+    state = exp.render_state()
+    crickets = cast(list[dict[str, Any]], state["crickets"])
+    assert crickets == []
+    # Despawned by age — không tính score
+    score = cast(int, state["score"])
+    crickets_flown = cast(int, state["crickets_flown"])
+    assert score == 0
+    assert crickets_flown == 0
