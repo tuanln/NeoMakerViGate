@@ -129,7 +129,22 @@ class YogaRobotExperience(BaseExperience):
         now = self._clock()
         self._step_phase(now)
         dt = now - self._last_step_at
-        if self._phase != Phase.POSING or not frame.pose:
+        if self._phase != Phase.POSING:
+            self._current_score = 0
+            self._last_step_at = now
+            return
+        # Stuck check — fires even on empty frames so 45s skip works without pose
+        if self._attempts:
+            attempt = self._attempts[-1]
+            if not attempt.matched_complete:
+                elapsed_in_attempt = now - attempt.started_at
+                if elapsed_in_attempt >= SKIP_AFTER_SEC:
+                    attempt.skipped = True
+                    attempt.final_score = 0
+                    self._advance_to_next_pose(now)
+                    self._last_step_at = now
+                    return
+        if not frame.pose:
             self._current_score = 0
             self._last_step_at = now
             return
@@ -141,21 +156,21 @@ class YogaRobotExperience(BaseExperience):
         target = self._poses[self._pose_index]
         score = pose_similarity_score(angles, target.target_angles, target.tolerance)
         self._current_score = int(score)
-        attempt = self._attempts[-1] if self._attempts else None
-        if attempt is None:
+        if not self._attempts:
             self._last_step_at = now
             return
+        attempt = self._attempts[-1]
         attempt.max_score_seen = max(attempt.max_score_seen, int(score))
 
         if score >= MATCH_THRESHOLD:
-            if (
-                attempt.last_match_at is not None
-                and now - attempt.last_match_at <= MATCH_GAP_TOLERANCE
-            ):
-                attempt.hold_progress += dt
-            else:
-                attempt.hold_progress = dt
+            attempt.hold_progress += dt
             attempt.last_match_at = now
+            if attempt.hold_progress >= HOLD_REQUIRED_SEC and not attempt.matched_complete:
+                attempt.matched_complete = True
+                attempt.final_score = attempt.max_score_seen
+                self._advance_to_next_pose(now)
+                self._last_step_at = now
+                return
         else:
             if (
                 attempt.last_match_at is not None
@@ -247,6 +262,14 @@ class YogaRobotExperience(BaseExperience):
         self._attempts.append(
             PoseAttempt(pose_id=self._poses[index].id, started_at=now)
         )
+
+    def _advance_to_next_pose(self, now: float) -> None:
+        next_index = self._pose_index + 1
+        if next_index >= len(self._poses):
+            self._phase = Phase.RESULT
+            self._phase_started_at = now
+        else:
+            self._start_pose(next_index, now)
 
 
 EXPERIENCE = YogaRobotExperience

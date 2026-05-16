@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import cast
+from typing import Any, cast
 
 import pytest
 
@@ -188,3 +188,56 @@ def test_match_lost_resets_hold_after_gap_tolerance(
     exp.on_vision_frame(vf_bad)
     state_reset = exp.render_state()
     assert cast(float, state_reset["hold_progress"]) == 0.0
+
+
+def test_match_held_3s_advances_to_next_pose(
+    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
+) -> None:
+    exp, clock = exp_with_clock
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_empty_frame())  # → POSING pose 0
+
+    # Hold T-pose 4s (8 ticks × 0.5s) — đủ vượt HOLD_REQUIRED_SEC=3
+    for _ in range(8):
+        clock.advance(0.5)
+        exp.on_vision_frame(_make_pose_frame())
+    state = exp.render_state()
+    # Phải sang pose 1 (TREE_POSE)
+    assert state["pose_index"] == 1
+    completed = cast(list[dict[str, Any]], state["completed_poses"])
+    assert len(completed) == 1
+    assert completed[0]["id"] == "T_POSE"
+    assert cast(int, completed[0]["final_score"]) > 0
+    assert completed[0]["skipped"] is False
+
+
+def test_all_5_poses_completed_transitions_to_result(
+    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
+) -> None:
+    exp, clock = exp_with_clock
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_empty_frame())  # → POSING pose 0
+
+    # Skip 5 poses qua 45s timer mỗi pose
+    for _ in range(5):
+        clock.advance(45.1)
+        exp.on_vision_frame(_make_empty_frame())
+    state = exp.render_state()
+    assert state["phase"] == Phase.RESULT.value
+
+
+def test_total_score_sums_pose_scores(
+    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
+) -> None:
+    exp, clock = exp_with_clock
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_empty_frame())  # → POSING pose 0
+
+    # Complete pose 0 với T-pose hold 4s
+    for _ in range(8):
+        clock.advance(0.5)
+        exp.on_vision_frame(_make_pose_frame())
+    state = exp.render_state()
+    completed = cast(list[dict[str, Any]], state["completed_poses"])
+    expected_total = sum(cast(int, p["final_score"]) for p in completed)
+    assert state["total_score"] == expected_total
