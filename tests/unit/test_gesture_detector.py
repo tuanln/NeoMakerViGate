@@ -115,13 +115,25 @@ def test_wave_after_cooldown_triggers_again() -> None:
 
 
 def test_reset_clears_buffer() -> None:
+    # Positive control: verify that WITHOUT reset, 7 buffered + 5 new samples
+    # (all within the 1s window) produce a WAVE trigger.
+    det_no_reset = GestureDetector()
+    partial = _make_sine_frames(cycles=2, amplitude=0.1, fps=30, duration=1.0, start_t=0.0)[:7]
+    for f in partial:
+        det_no_reset.feed(f)
+    after = _make_sine_frames(cycles=2, amplitude=0.1, fps=30, duration=1.0, start_t=0.5)[:5]
+    gestures_no_reset: list[str] = []
+    for f in after:
+        gestures_no_reset.extend(det_no_reset.feed(f))
+    assert "WAVE" in gestures_no_reset, "positive control failed: 7+5 samples should trigger WAVE"
+
+    # Actual test: WITH reset, the same 5 new samples cannot trigger.
+    # reset() wipes the 7 buffered samples so only 5 < WAVE_MIN_SAMPLES=8 remain.
     det = GestureDetector()
-    # Push static idle frames (wrist đứng yên)
-    for i in range(15):
-        det.feed(_make_frame(0.5, i / 30.0))
-    det.reset()
-    # Push thêm static frames nữa — vì reset đã clear, buffer trống, không có pattern để trigger
+    for f in partial:
+        det.feed(f)  # Load 7 samples into buffer
+    det.reset()  # Clear buffer (and cooldown)
     gestures: list[str] = []
-    for i in range(15):
-        gestures.extend(det.feed(_make_frame(0.5, 0.5 + i / 30.0)))
-    assert gestures == []
+    for f in after:
+        gestures.extend(det.feed(f))  # Only 5 new samples — below minimum
+    assert gestures == []  # Buffer cleared → 5 < 8 → no trigger possible
