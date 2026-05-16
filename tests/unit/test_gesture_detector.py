@@ -50,3 +50,33 @@ def test_wrist_idle_no_gesture() -> None:
     for i in range(30):
         gestures.extend(det.feed(_make_frame(0.5, i / 30.0)))
     assert gestures == []
+
+
+def test_wave_two_sine_cycles_triggers() -> None:
+    det = GestureDetector()
+    # 2 chu kỳ sine biên 0.1 trong 1s @ 30fps = 30 frames
+    frames = _make_sine_frames(cycles=2, amplitude=0.1, fps=30, duration=1.0)
+    gestures: list[str] = []
+    for f in frames:
+        gestures.extend(det.feed(f))
+    assert "WAVE" in gestures
+
+
+def test_wave_amplitude_too_small_no_trigger() -> None:
+    det = GestureDetector()
+    # Biên 0.02 < threshold 0.05 — không trigger dù có crossings
+    frames = _make_sine_frames(cycles=2, amplitude=0.02, fps=30, duration=1.0)
+    gestures: list[str] = []
+    for f in frames:
+        gestures.extend(det.feed(f))
+    assert gestures == []
+
+
+def test_wave_single_crossing_no_trigger() -> None:
+    det = GestureDetector()
+    # 0.25 cycle: chỉ qua baseline 1 lần (baseline → peak → baseline)
+    frames = _make_sine_frames(cycles=0.25, amplitude=0.1, fps=30, duration=1.0)
+    gestures: list[str] = []
+    for f in frames:
+        gestures.extend(det.feed(f))
+    assert gestures == []
