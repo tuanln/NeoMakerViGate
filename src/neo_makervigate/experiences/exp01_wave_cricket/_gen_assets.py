@@ -17,7 +17,7 @@ SAMPLE_RATE = 22050
 ASSETS_DIR = Path(__file__).parent / "assets"
 
 
-def _envelope(n: int, attack: float = 0.05, release: float = 0.3) -> "np.ndarray[tuple[int], np.dtype[np.float64]]":
+def _envelope(n: int, attack: float = 0.05, release: float = 0.3) -> np.ndarray[tuple[int], np.dtype[np.float64]]:
     """Linear attack + exponential release envelope."""
     env = np.ones(n)
     a = int(attack * n)
@@ -29,7 +29,7 @@ def _envelope(n: int, attack: float = 0.05, release: float = 0.3) -> "np.ndarray
     return env
 
 
-def _save(name: str, signal: "np.ndarray[tuple[int], np.dtype[np.float64]]") -> None:
+def _save(name: str, signal: np.ndarray[tuple[int], np.dtype[np.float64]]) -> None:
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
     # Normalize to int16 range
     peak = np.max(np.abs(signal))
