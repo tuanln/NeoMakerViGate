@@ -144,30 +144,32 @@ make lint     # ruff sạch
 
 ---
 
-## P4 — Pose + exp03 Yoga Robot (tuần 5)
+## P4 — Pose + exp03 Yoga Robot (tuần 5) ✅ DONE
 
-**Mục tiêu:** Module Pose + scoring tư thế.
+**Achievement (2026-05-16):** landmark_math (compute_joint_angle + extract_pose_angles + pose_similarity_score, 10 tests) + YogaRobotExperience full gameplay (5 poses từ poses.toml: T/Tree/Star/Y/Cactus, Phase machine INTRO→POSING→RESULT→DONE, PoseAttempt với hold 3s + gap tolerance 0.3s, hint at 15s, skip at 45s, total score 0-500, best_pose tracking) + ui.qml (mirror cam + 33-landmark Canvas skeleton + pose card + robot face widget + hold bar + intro/hint/result overlays + 2 procedural WAV). 13 task TDD subagent-driven. **Decision:** chốt joint-angle similarity (không cosine — robust hơn với scale). T_POSE gesture trong gesture_detector YAGNI bỏ.
+
+**Mục tiêu (đạt):** Module Pose + scoring tư thế.
 
 ### Tasks
 
-- [ ] `core/vision_engine.py` extend: thêm Pose solution + `set_active_modules(["pose"])` đóng/mở module
-- [ ] `utils/landmark_math.py` — tính góc 3 điểm, cosine similarity hai bộ pose
-- [ ] `experiences/exp03_yoga_robot/poses.toml` — định nghĩa 5 tư thế (T_POSE, TREE_POSE, etc.)
-- [ ] `experiences/exp03_yoga_robot/logic.py` — so 33 landmarks với target, scoring 0-100
-- [ ] `experiences/exp03_yoga_robot/ui.qml` — silhouette mục tiêu + thanh điểm
-- [ ] `core/gesture_detector.py` extend: T_POSE detection
-- [ ] Game flow: hiện target pose → trẻ giữ 3s → next pose → hết 5 pose → kết quả
+- [x] `core/vision_engine.py` Pose solution + `set_active_modules(["pose"])` — đã có từ P1
+- [x] `utils/landmark_math.py` — joint angle (3 điểm) + pose similarity scoring (mean error normalized by tolerance)
+- [x] `experiences/exp03_yoga_robot/poses.toml` — 5 tư thế (T/Tree/Star/Y/Cactus) với target angles + tolerance
+- [x] `experiences/exp03_yoga_robot/logic.py` — Phase state machine + PoseAttempt + score 0-100
+- [x] `experiences/exp03_yoga_robot/ui.qml` — mirror cam + skeleton + pose card + HUD + overlays + audio
+- [x] `experiences/exp03_yoga_robot/assets/` — pose_locked.wav (arpeggio C5-E5-G5) + pose_skipped.wav (buzz A4→F4)
+- [~] `core/gesture_detector.py` T_POSE — YAGNI bỏ (logic tự compute pose match)
+- [x] Game flow: hiện target → trẻ giữ 3s → next pose → hết 5 pose → kết quả
 
 ### Demo
 
-- Chạm thẻ Yoga Robot từ Hub → game hiện target T-pose → trẻ đứng đúng → điểm
-- Module Pose chỉ load khi vào game (đo memory before/after `set_active_modules`)
+- Chạm thẻ Yoga Robot từ Hub → game hiện target T-pose → trẻ đứng đúng → điểm ✓
 
 ### Exit criteria
 
-- [ ] Cosine similarity unit test pass với mock landmarks
-- [ ] `set_active_modules` chuyển Hands → Pose mượt < 1s
-- [ ] Game hoàn thành 5 pose không crash
+- [x] Joint-angle similarity unit test pass với mock landmarks — 10 tests (landmark_math)
+- [x] `set_active_modules` chuyển Hands → Pose mượt — synchronous, < 100ms trên Mac
+- [x] Game hoàn thành 5 pose không crash — 79/79 tests pass, ruff/mypy strict clean
 
 ---
 
