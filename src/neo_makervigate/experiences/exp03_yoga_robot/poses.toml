@@ -1,0 +1,91 @@
+[[poses]]
+id = "T_POSE"
+title = "Chữ T"
+emoji = "✝️"
+subtitle = "Dang tay sang ngang như chữ T"
+[poses.angles]
+left_shoulder = 90
+right_shoulder = 90
+left_elbow = 180
+right_elbow = 180
+left_hip = 180
+right_hip = 180
+[poses.tolerance]
+shoulder = 20
+elbow = 15
+hip = 15
+knee = 30
+
+[[poses]]
+id = "TREE_POSE"
+title = "Cây Đứng"
+emoji = "🌳"
+subtitle = "Co 1 chân, tay giơ lên trời"
+[poses.angles]
+left_shoulder = 170
+right_shoulder = 170
+left_elbow = 160
+right_elbow = 160
+left_hip = 180
+right_hip = 90
+left_knee = 180
+right_knee = 45
+[poses.tolerance]
+shoulder = 25
+elbow = 25
+hip = 25
+knee = 30
+
+[[poses]]
+id = "STAR_POSE"
+title = "Ngôi Sao"
+emoji = "⭐"
+subtitle = "Dang tay + chân như chữ X"
+[poses.angles]
+left_shoulder = 135
+right_shoulder = 135
+left_elbow = 180
+right_elbow = 180
+left_hip = 135
+right_hip = 135
+[poses.tolerance]
+shoulder = 20
+elbow = 15
+hip = 20
+knee = 30
+
+[[poses]]
+id = "Y_POSE"
+title = "Chữ Y"
+emoji = "🙌"
+subtitle = "Hai tay giơ lên thành chữ V"
+[poses.angles]
+left_shoulder = 160
+right_shoulder = 160
+left_elbow = 175
+right_elbow = 175
+left_hip = 180
+right_hip = 180
+[poses.tolerance]
+shoulder = 20
+elbow = 15
+hip = 15
+knee = 30
+
+[[poses]]
+id = "CACTUS_POSE"
+title = "Xương Rồng"
+emoji = "🌵"
+subtitle = "Tay co 90° hai bên đầu"
+[poses.angles]
+left_shoulder = 90
+right_shoulder = 90
+left_elbow = 90
+right_elbow = 90
+left_hip = 180
+right_hip = 180
+[poses.tolerance]
+shoulder = 20
+elbow = 20
+hip = 15
+knee = 30
