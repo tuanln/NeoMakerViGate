@@ -128,32 +128,103 @@ class YogaRobotExperience(BaseExperience):
     def on_vision_frame(self, frame: VisionFrame) -> None:
         now = self._clock()
         self._step_phase(now)
-        # Stub — pose scoring sẽ thêm trong T5+
-        _ = extract_pose_angles  # silence unused-import; used in T5
-        _ = pose_similarity_score
+        dt = now - self._last_step_at
+        if self._phase != Phase.POSING or not frame.pose:
+            self._current_score = 0
+            self._last_step_at = now
+            return
+        if self._pose_index >= len(self._poses):
+            self._last_step_at = now
+            return
+
+        angles = extract_pose_angles(frame.pose)
+        target = self._poses[self._pose_index]
+        score = pose_similarity_score(angles, target.target_angles, target.tolerance)
+        self._current_score = int(score)
+        attempt = self._attempts[-1] if self._attempts else None
+        if attempt is None:
+            self._last_step_at = now
+            return
+        attempt.max_score_seen = max(attempt.max_score_seen, int(score))
+
+        if score >= MATCH_THRESHOLD:
+            if (
+                attempt.last_match_at is not None
+                and now - attempt.last_match_at <= MATCH_GAP_TOLERANCE
+            ):
+                attempt.hold_progress += dt
+            else:
+                attempt.hold_progress = dt
+            attempt.last_match_at = now
+        else:
+            if (
+                attempt.last_match_at is not None
+                and now - attempt.last_match_at > MATCH_GAP_TOLERANCE
+            ):
+                attempt.hold_progress = 0.0
+                attempt.last_match_at = None
+
         self._last_step_at = now
 
     def render_state(self) -> dict[str, object]:
         now = self._clock()
+        current_pose_dict: dict[str, object] | None = None
+        attempt = self._attempts[-1] if self._attempts else None
+        elapsed_in_pose = 0.0
+        hold_progress = 0.0
+        max_score = 0
+        if self._phase == Phase.POSING and self._pose_index < len(self._poses):
+            target = self._poses[self._pose_index]
+            current_pose_dict = {
+                "id": target.id,
+                "title": target.title,
+                "emoji": target.emoji,
+                "subtitle": target.subtitle,
+                "target_angles": dict(target.target_angles),
+            }
+            if attempt is not None:
+                elapsed_in_pose = now - attempt.started_at
+                hold_progress = attempt.hold_progress
+                max_score = attempt.max_score_seen
         return {
             "phase": self._phase.value,
             "elapsed_in_phase": now - self._phase_started_at,
             "pose_index": self._pose_index,
             "pose_count": len(self._poses),
-            "current_pose": None,
+            "current_pose": current_pose_dict,
             "score": self._current_score,
-            "max_score_in_attempt": 0,
+            "max_score_in_attempt": max_score,
             "match_threshold": int(MATCH_THRESHOLD),
-            "hold_progress": 0.0,
+            "hold_progress": hold_progress,
             "hold_required": HOLD_REQUIRED_SEC,
-            "elapsed_in_pose": 0.0,
-            "show_hint": False,
+            "elapsed_in_pose": elapsed_in_pose,
+            "show_hint": elapsed_in_pose >= HINT_AFTER_SEC,
             "stuck_skip_at": SKIP_AFTER_SEC,
-            "completed_poses": [],
-            "total_score": 0,
-            "best_pose_id": None,
-            "pose_landmarks_present": False,
+            "completed_poses": [
+                {
+                    "id": a.pose_id,
+                    "final_score": a.final_score,
+                    "skipped": a.skipped,
+                }
+                for a in self._attempts
+                if a.matched_complete or a.skipped
+            ],
+            "total_score": sum(
+                a.final_score for a in self._attempts if a.matched_complete or a.skipped
+            ),
+            "best_pose_id": self._best_pose_id(),
+            "pose_landmarks_present": bool(
+                self._current_score > 0
+                or (attempt is not None and attempt.max_score_seen > 0)
+            ),
         }
+
+    def _best_pose_id(self) -> str | None:
+        completed = [a for a in self._attempts if a.matched_complete or a.skipped]
+        if not completed:
+            return None
+        best = max(completed, key=lambda a: a.final_score)
+        return best.pose_id
 
     def completion_summary(self) -> dict[str, Any]:
         return {
