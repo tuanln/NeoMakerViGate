@@ -149,4 +149,197 @@ Item {
             }
         }
     }
+
+    // ---- Bottom HUD: robot face + hold bar + score ----
+    Rectangle {
+        visible: root.phase === "posing"
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.margins: 24
+        height: 140
+        radius: 24
+        color: "#E0000000"
+
+        RowLayout {
+            anchors.fill: parent
+            anchors.margins: 16
+            spacing: 24
+
+            // Robot face widget
+            Item {
+                Layout.preferredWidth: 120
+                Layout.fillHeight: true
+                Text {
+                    anchors.centerIn: parent
+                    text: {
+                        const s = root.score
+                        if (s >= root.matchThreshold) return "😄"
+                        if (s >= 40) return "🙂"
+                        return "😐"
+                    }
+                    font.pixelSize: 96
+                }
+            }
+
+            // Center column: hold bar + score
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: 8
+
+                // Hold progress bar
+                Item {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 32
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 16
+                        color: "#FF1F3018"
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            anchors.margins: 4
+                            width: Math.min(1, root.holdProgress / root.holdRequired) * (parent.width - 8)
+                            radius: 12
+                            color: (root.holdProgress / root.holdRequired) > 0.66 ? "#FFC77B2C" : "#FF5C8A3A"
+                            Behavior on width { NumberAnimation { duration: 50 } }
+                        }
+                    }
+                    Text {
+                        anchors.centerIn: parent
+                        text: root.holdProgress.toFixed(1) + "s / " + root.holdRequired.toFixed(1) + "s"
+                        color: "white"
+                        font.pixelSize: 18
+                        font.bold: true
+                    }
+                }
+
+                // Score number
+                Text {
+                    text: "Điểm: " + root.score + "/100  (cần " + root.matchThreshold + "+)"
+                    color: "white"
+                    font.pixelSize: 22
+                    font.bold: true
+                    Layout.alignment: Qt.AlignHCenter
+                }
+            }
+        }
+    }
+
+    // ---- Intro overlay ----
+    Rectangle {
+        visible: root.phase === "intro"
+        anchors.fill: parent
+        color: "#A0000000"
+
+        ColumnLayout {
+            anchors.centerIn: parent
+            spacing: 24
+            Text {
+                text: "🤖 Bắt chước Robot 5 tư thế!"
+                color: "white"
+                font.pixelSize: 56
+                font.bold: true
+                Layout.alignment: Qt.AlignHCenter
+            }
+            Text {
+                text: "✝️  🌳  ⭐  🙌  🌵"
+                color: "#FAF6EE"
+                font.pixelSize: 64
+                Layout.alignment: Qt.AlignHCenter
+            }
+            Text {
+                text: "Sẵn sàng nhé..."
+                color: "#FAF6EE"
+                font.pixelSize: 28
+                Layout.alignment: Qt.AlignHCenter
+            }
+        }
+    }
+
+    // ---- Hint overlay (semi-transparent, when stuck 15s+) ----
+    Rectangle {
+        visible: root.showHint && root.phase === "posing"
+        anchors.fill: parent
+        color: "#40000000"
+
+        Text {
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 200
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: "💡 Thử bắt chước hình " + (root.currentPose ? root.currentPose.emoji : "")
+            color: "white"
+            font.pixelSize: 32
+            font.bold: true
+            style: Text.Outline
+            styleColor: "black"
+        }
+    }
+
+    // ---- Result overlay ----
+    Rectangle {
+        visible: root.phase === "result"
+        anchors.fill: parent
+        color: "#C0000000"
+
+        ColumnLayout {
+            anchors.centerIn: parent
+            spacing: 24
+            Text {
+                text: "🎉 Hoàn thành!"
+                color: "white"
+                font.pixelSize: 72
+                font.bold: true
+                Layout.alignment: Qt.AlignHCenter
+            }
+            Text {
+                text: "Tổng điểm: " + root.totalScore + " / 500"
+                color: "#C77B2C"
+                font.pixelSize: 48
+                font.bold: true
+                Layout.alignment: Qt.AlignHCenter
+            }
+            Text {
+                text: root.bestPoseId !== "" ? "Tư thế giỏi nhất: " + root.bestPoseId : ""
+                color: "#FAF6EE"
+                font.pixelSize: 28
+                visible: root.bestPoseId !== ""
+                Layout.alignment: Qt.AlignHCenter
+            }
+        }
+    }
+
+    // ---- Audio ----
+    SoundEffect {
+        id: sfxLocked
+        source: Qt.resolvedUrl("assets/pose_locked.wav")
+    }
+    SoundEffect {
+        id: sfxSkipped
+        source: Qt.resolvedUrl("assets/pose_skipped.wav")
+    }
+
+    // Track completed count to play sfx on change
+    property int lastCompletedCount: 0
+    property string lastPhase: ""
+
+    onCompletedPosesChanged: {
+        const count = completedPoses.length
+        if (count > lastCompletedCount) {
+            // Lookup most recent completed
+            const last = completedPoses[count - 1]
+            if (last && last.skipped) {
+                sfxSkipped.play()
+            } else {
+                sfxLocked.play()
+            }
+        }
+        lastCompletedCount = count
+    }
+
+    onPhaseChanged: {
+        lastPhase = phase
+    }
 }
