@@ -77,3 +77,43 @@ def test_intro_waves_do_not_carry_into_playing() -> None:
     crickets = cast(list[object], state["crickets"])
     assert len(crickets) == 1, f"Expected 1 cricket, got {len(crickets)} — flock pre-armed from INTRO"
     assert state["flock_bonus_active"] is False
+
+
+def test_intro_transitions_to_playing_after_2s(
+    exp_with_clock: tuple[WaveCricketExperience, _FakeClock],
+) -> None:
+    exp, clock = exp_with_clock
+    # Tick frame ngay sau enter
+    exp.on_vision_frame(_make_frame())
+    assert exp.render_state()["phase"] == Phase.INTRO.value
+    # Advance 2.1s qua INTRO duration
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_frame())
+    assert exp.render_state()["phase"] == Phase.PLAYING.value
+
+
+def test_playing_transitions_to_result_after_60s(
+    exp_with_clock: tuple[WaveCricketExperience, _FakeClock],
+) -> None:
+    exp, clock = exp_with_clock
+    # INTRO → PLAYING
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_frame())
+    assert exp.render_state()["phase"] == Phase.PLAYING.value
+    # PLAYING 60s → RESULT
+    clock.advance(60.1)
+    exp.on_vision_frame(_make_frame())
+    assert exp.render_state()["phase"] == Phase.RESULT.value
+
+
+def test_result_transitions_to_done_after_3s(
+    exp_with_clock: tuple[WaveCricketExperience, _FakeClock],
+) -> None:
+    exp, clock = exp_with_clock
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_frame())  # → PLAYING
+    clock.advance(60.1)
+    exp.on_vision_frame(_make_frame())  # → RESULT
+    clock.advance(3.1)
+    exp.on_vision_frame(_make_frame())  # → DONE
+    assert exp.render_state()["phase"] == Phase.DONE.value
