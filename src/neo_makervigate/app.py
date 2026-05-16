@@ -24,6 +24,7 @@ from PyQt6.QtQml import QQmlApplicationEngine
 
 from neo_makervigate import __version__
 from neo_makervigate.config.settings import load_settings
+from neo_makervigate.core.gesture_detector import GestureDetector
 from neo_makervigate.core.vision_engine import VisionEngine, VisionSource
 from neo_makervigate.core.vision_simulator import VisionSimulator
 from neo_makervigate.core.vision_worker import VisionWorker
@@ -66,6 +67,11 @@ def run(argv: list[str]) -> int:
     # Vision pipeline
     source = _create_vision_source(settings.vision_source)
     worker = VisionWorker(source, initial_modules=["hands"])
+
+    # Gesture detector — emit gesture_detected qua SignalBus
+    gesture_detector = GestureDetector()
+    bus.vision_frame_ready.connect(gesture_detector.feed)
+    bus.experience_ended.connect(lambda *_: gesture_detector.reset())
 
     # Experience plugin registry + manager
     registry = discover_experiences()

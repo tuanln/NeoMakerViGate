@@ -94,7 +94,7 @@ def test_wave_cooldown_blocks_immediate_retrigger() -> None:
 
     # Vẫy lại ngay trong 0.05s (< 0.4s cooldown) — cooldown phải chặn
     # frames1 kết thúc ~1.0s, last WAVE ~0.67s → cooldown_until ~1.067s
-    # frames2 start 1.0s, duration 0.05s → kết thúc 1.05s, hoàn toàn trong cooldown
+    # frames2: 1 frame duy nhất tại t=1.0s (int(30*0.05)=1) — nằm trong cooldown (< 1.067s)
     frames2 = _make_sine_frames(cycles=2, amplitude=0.1, fps=30, duration=0.05, start_t=1.0)
     for f in frames2:
         gestures.extend(det.feed(f))
