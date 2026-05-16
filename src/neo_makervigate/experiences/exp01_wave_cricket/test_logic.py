@@ -75,7 +75,8 @@ def test_intro_waves_do_not_carry_into_playing() -> None:
     exp.on_gesture("WAVE")
     state = exp.render_state()
     crickets = cast(list[object], state["crickets"])
-    assert len(crickets) == 1, f"Expected 1 cricket, got {len(crickets)} — flock pre-armed from INTRO"
+    msg = f"Expected 1 cricket, got {len(crickets)} — flock pre-armed from INTRO"
+    assert len(crickets) == 1, msg
     assert state["flock_bonus_active"] is False
 
 
