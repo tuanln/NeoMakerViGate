@@ -122,7 +122,7 @@ disable_error_code = ["misc", "untyped-decorator"]
 
 [tool.pytest.ini_options]
 minversion = "7.4"
-testpaths = ["tests"]
+testpaths = ["tests", "src"]
 addopts = "-ra --strict-markers --strict-config"
 markers = [
     "slow: tests chạy chậm (>1s)",

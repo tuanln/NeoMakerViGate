@@ -194,6 +194,8 @@ class WaveCricketExperience(BaseExperience):
         if self._phase == Phase.INTRO and elapsed >= INTRO_DURATION:
             self._phase = Phase.PLAYING
             self._phase_started_at = now
+            # Don't carry pre-game waves into play
+            self._wave_timestamps.clear()
         elif self._phase == Phase.PLAYING and elapsed >= PLAYING_DURATION:
             self._phase = Phase.RESULT
             self._phase_started_at = now

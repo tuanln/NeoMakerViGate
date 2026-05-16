@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -56,3 +56,24 @@ def test_initial_phase_is_intro(exp_with_clock: tuple[WaveCricketExperience, _Fa
     assert state["phase"] == Phase.INTRO.value
     assert state["score"] == 0
     assert state["crickets"] == []
+
+
+def test_intro_waves_do_not_carry_into_playing() -> None:
+    """Waves during INTRO must not contribute to flock detection in PLAYING."""
+    clock = _FakeClock(0.0)
+    exp = WaveCricketExperience(clock=clock)
+    exp.on_enter()
+    # 3 rapid waves during INTRO
+    for offset in (0.3, 0.6, 0.9):
+        clock.t = offset
+        exp.on_gesture("WAVE")
+    # Advance to PLAYING
+    clock.advance(2.0 - 0.9 + 0.2)  # to t=2.2s
+    exp.on_vision_frame(_make_frame())  # triggers phase transition in _step_phase
+    assert exp.render_state()["phase"] == Phase.PLAYING.value
+    # First WAVE in PLAYING — should spawn ONE, not a flock
+    exp.on_gesture("WAVE")
+    state = exp.render_state()
+    crickets = cast(list[object], state["crickets"])
+    assert len(crickets) == 1, f"Expected 1 cricket, got {len(crickets)} — flock pre-armed from INTRO"
+    assert state["flock_bonus_active"] is False
