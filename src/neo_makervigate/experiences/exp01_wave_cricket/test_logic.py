@@ -117,3 +117,44 @@ def test_result_transitions_to_done_after_3s(
     clock.advance(3.1)
     exp.on_vision_frame(_make_frame())  # → DONE
     assert exp.render_state()["phase"] == Phase.DONE.value
+
+
+def test_wave_during_intro_does_not_spawn(
+    exp_with_clock: tuple[WaveCricketExperience, _FakeClock],
+) -> None:
+    exp, _ = exp_with_clock
+    exp.on_vision_frame(_make_frame(wrist_x=0.3, wrist_y=0.4))
+    exp.on_gesture("WAVE")
+    state: dict[str, Any] = exp.render_state()
+    crickets = cast(list[object], state["crickets"])
+    assert crickets == []
+
+
+def test_wave_during_playing_spawns_cricket_at_wrist(
+    exp_with_clock: tuple[WaveCricketExperience, _FakeClock],
+) -> None:
+    exp, clock = exp_with_clock
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_frame(wrist_x=0.3, wrist_y=0.4))  # → PLAYING
+    exp.on_gesture("WAVE")
+    state: dict[str, Any] = exp.render_state()
+    crickets = cast(list[object], state["crickets"])
+    assert len(crickets) == 1
+    c0 = cast(dict[str, Any], crickets[0])
+    assert isinstance(c0["x"], float)
+    assert isinstance(c0["y"], float)
+    assert abs(c0["x"] - 0.3) < 1e-6
+    assert abs(c0["y"] - 0.4) < 1e-6
+
+
+def test_non_wave_gesture_ignored(
+    exp_with_clock: tuple[WaveCricketExperience, _FakeClock],
+) -> None:
+    exp, clock = exp_with_clock
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_frame())
+    exp.on_gesture("V_SIGN")
+    exp.on_gesture("POINT")
+    state: dict[str, Any] = exp.render_state()
+    assert state["crickets"] == []
+    assert state["score"] == 0
