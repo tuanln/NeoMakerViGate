@@ -235,3 +235,55 @@ def test_cricket_despawns_after_max_age_without_score() -> None:
     crickets_flown = cast(int, state["crickets_flown"])
     assert score == 0
     assert crickets_flown == 0
+
+
+def test_three_rapid_waves_spawn_flock(
+    exp_with_clock: tuple[WaveCricketExperience, _FakeClock],
+) -> None:
+    """3 rapid waves trong 2s → spawn flock 6 con + flock_bonus_active=True."""
+    exp, clock = exp_with_clock
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_frame(wrist_x=0.5, wrist_y=0.5))
+    # WAVE 1 + 2: spawn 1 con mỗi lần
+    exp.on_gesture("WAVE")
+    clock.advance(0.2)
+    exp.on_vision_frame(_make_frame(wrist_x=0.5, wrist_y=0.5))
+    exp.on_gesture("WAVE")
+    state = exp.render_state()
+    crickets = cast(list[dict[str, Any]], state["crickets"])
+    assert len(crickets) == 2
+    # WAVE 3 trong vòng 2s: trigger flock — spawn 1 + 5 = 6 thêm
+    clock.advance(0.2)
+    exp.on_vision_frame(_make_frame(wrist_x=0.5, wrist_y=0.5))
+    exp.on_gesture("WAVE")
+    state = exp.render_state()
+    crickets = cast(list[dict[str, Any]], state["crickets"])
+    assert len(crickets) == 2 + 6
+    assert state["flock_bonus_active"] is True
+
+
+def test_flock_multiplier_applies_to_score() -> None:
+    """Cricket bay khỏi top trong flock window → score × 1.5."""
+    import random as _r
+    clock = _FakeClock(0.0)
+    exp = WaveCricketExperience(clock=clock, rng=_r.Random(42))
+    exp.on_enter()
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_frame(wrist_x=0.5, wrist_y=0.1))
+    # 3 rapid WAVE để trigger flock
+    exp.on_gesture("WAVE")
+    clock.advance(0.1)
+    exp.on_vision_frame(_make_frame(wrist_x=0.5, wrist_y=0.1))
+    exp.on_gesture("WAVE")
+    clock.advance(0.1)
+    exp.on_vision_frame(_make_frame(wrist_x=0.5, wrist_y=0.1))
+    exp.on_gesture("WAVE")
+    # Advance cho tất cả bay khỏi top (vy có thể tới -0.5 → ~0.4s)
+    clock.advance(2.0)
+    exp.on_vision_frame(_make_frame(wrist_x=0.5, wrist_y=0.1))
+    state = exp.render_state()
+    score = cast(int, state["score"])
+    crickets_flown = cast(int, state["crickets_flown"])
+    # Mỗi cricket flown trong window bonus → 15 điểm thay 10
+    assert crickets_flown > 0
+    assert score >= 15 * crickets_flown
