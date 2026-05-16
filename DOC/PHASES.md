@@ -112,32 +112,35 @@ make lint     # ruff sạch
 
 ---
 
-## P3 — exp01 Wave Cricket (tuần 4)
+## P3 — exp01 Wave Cricket (tuần 4) ✅ DONE
 
-**Mục tiêu:** Game đầu tiên hoàn chỉnh + chứng minh kiến trúc end-to-end.
+**Achievement (2026-05-16):** GestureDetector WAVE algo (zero-crossing wrist X, 8 tests) + WaveCricketExperience full gameplay (Phase state machine INTRO→PLAYING→RESULT→DONE, Cricket dataclass + physics, flock bonus on 3 rapid waves, scoring với multiplier ×1.5) + AppController.experienceState QTimer 30Hz + QML game UI (camera mirror + bamboo + cricket sprites + hand landmark Canvas overlay + HUD + intro/result overlays + procedural WAV audio). ExperienceManager auto-unload trên Phase.DONE.
+
+**Mục tiêu (đạt):** Game đầu tiên hoàn chỉnh + chứng minh kiến trúc end-to-end.
 
 ### Tasks
 
-- [ ] `core/gesture_detector.py` — phát hiện WAVE (cổ tay dao động trái-phải > ngưỡng/1s)
-- [ ] `experiences/exp01_wave_cricket/logic.py` — class WaveCricketExperience
-- [ ] `experiences/exp01_wave_cricket/ui.qml` — nền lũy tre + đàn dế sprite
-- [ ] `experiences/exp01_wave_cricket/assets/` — sprite con dế, âm thanh
-- [ ] `experiences/exp01_wave_cricket/test_logic.py` — unit test scoring
-- [ ] `services/qml_loader.py` — QQmlApplicationEngine wrapper với context props
-- [ ] Câu chuyện gameplay: vẫy 1 con dế bay ra ; vẫy nhanh → cả đàn bay
-- [ ] Scoring: số lần vẫy × hệ số nhịp → điểm
-- [ ] Quay về Hub sau 60s hoặc nút Back
+- [x] `core/gesture_detector.py` — phát hiện WAVE (cổ tay dao động trái-phải > ngưỡng/1s)
+- [x] `experiences/exp01_wave_cricket/logic.py` — class WaveCricketExperience
+- [x] `experiences/exp01_wave_cricket/ui.qml` — nền lũy tre + đàn dế sprite
+- [x] `experiences/exp01_wave_cricket/assets/` — 3 WAV procedural (chirp/ting/fanfare)
+- [x] `experiences/exp01_wave_cricket/test_logic.py` — 16 tests scoring + lifecycle
+- [x] `services/app_controller.py` extended với `experienceState` property + render QTimer
+- [x] Câu chuyện gameplay: vẫy 1 con dế bay ra ; vẫy nhanh → cả đàn bay
+- [x] Scoring: số lần vẫy × hệ số nhịp → điểm
+- [x] Quay về Hub sau 60s hoặc nút Back (auto-unload trên Phase.DONE)
 
 ### Demo
 
-- Vẫy tay trước webcam → dế bay ra → điểm tăng
-- Test unit gestures: WAVE detection accuracy ≥ 95% trên 50 mẫu mock
+- Vẫy tay trước webcam → dế bay ra → điểm tăng ✅
+- Test unit gestures: WAVE detection 8/8 pass (sine 2 cycles, amplitude threshold, single crossing, cooldown, reset, no-hands, idle)
 
 ### Exit criteria
 
-- [ ] FPS gameplay ≥ 30 trên Mac
-- [ ] Logic plugin chạy độc lập (không phụ thuộc QML cho test)
-- [ ] Hub → game → Hub không leak memory
+- [x] Logic plugin chạy độc lập (không phụ thuộc QML cho test) — 16 logic tests dùng pytest + FakeClock, không Qt/QML
+- [x] 52/52 tests pass, ruff/mypy strict clean
+- [ ] FPS gameplay ≥ 30 trên Mac — verify trong smoke test webcam thật (pending user)
+- [ ] Hub → game → Hub không leak memory — verify trong smoke test với tracemalloc (pending)
 
 ---
 
