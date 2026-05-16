@@ -241,3 +241,56 @@ def test_total_score_sums_pose_scores(
     completed = cast(list[dict[str, Any]], state["completed_poses"])
     expected_total = sum(cast(int, p["final_score"]) for p in completed)
     assert state["total_score"] == expected_total
+
+
+def test_stuck_45s_skips_pose_with_score_0(
+    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
+) -> None:
+    exp, clock = exp_with_clock
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_empty_frame())  # → POSING pose 0
+
+    # 45.1s không match → skip
+    clock.advance(45.1)
+    exp.on_vision_frame(_make_empty_frame())
+    state = exp.render_state()
+    completed = cast(list[dict[str, Any]], state["completed_poses"])
+    assert len(completed) == 1
+    assert completed[0]["skipped"] is True
+    assert completed[0]["final_score"] == 0
+
+
+def test_show_hint_true_at_15s(
+    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
+) -> None:
+    exp, clock = exp_with_clock
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_empty_frame())  # → POSING pose 0
+
+    # Trước 15s: show_hint False
+    clock.advance(10.0)
+    exp.on_vision_frame(_make_empty_frame())
+    assert exp.render_state()["show_hint"] is False
+    # Sau 15s: show_hint True (16s in pose)
+    clock.advance(6.0)
+    exp.on_vision_frame(_make_empty_frame())
+    assert exp.render_state()["show_hint"] is True
+
+
+def test_result_transitions_to_done_after_3s(
+    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
+) -> None:
+    exp, clock = exp_with_clock
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_empty_frame())  # → POSING
+
+    # Skip all 5 poses
+    for _ in range(5):
+        clock.advance(45.1)
+        exp.on_vision_frame(_make_empty_frame())
+    assert exp.render_state()["phase"] == Phase.RESULT.value
+
+    # Sau 3s → DONE
+    clock.advance(3.1)
+    exp.on_vision_frame(_make_empty_frame())
+    assert exp.render_state()["phase"] == Phase.DONE.value

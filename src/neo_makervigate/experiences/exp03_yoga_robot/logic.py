@@ -254,6 +254,9 @@ class YogaRobotExperience(BaseExperience):
             self._phase = Phase.POSING
             self._phase_started_at = now
             self._start_pose(0, now)
+        elif self._phase == Phase.RESULT and elapsed >= RESULT_DURATION:
+            self._phase = Phase.DONE
+            self._phase_started_at = now
 
     def _start_pose(self, index: int, now: float) -> None:
         if index >= len(self._poses):
