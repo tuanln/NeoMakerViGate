@@ -80,3 +80,24 @@ def test_poses_toml_loaded_5_poses(
     exp, _ = exp_with_clock
     state = exp.render_state()
     assert state["pose_count"] == 5
+
+
+def test_intro_transitions_to_posing_after_2s(
+    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
+) -> None:
+    exp, clock = exp_with_clock
+    state = exp.render_state()
+    assert state["phase"] == Phase.INTRO.value
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_empty_frame())
+    assert exp.render_state()["phase"] == Phase.POSING.value
+
+
+def test_posing_starts_at_pose_index_0(
+    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
+) -> None:
+    exp, clock = exp_with_clock
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_empty_frame())
+    state = exp.render_state()
+    assert state["pose_index"] == 0
