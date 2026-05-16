@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 from loguru import logger
 from PyQt6.QtCore import (  # type: ignore[attr-defined]
     QObject,
+    QTimer,
     pyqtProperty,
     pyqtSignal,
     pyqtSlot,
@@ -42,6 +43,7 @@ class AppController(QObject):
     experienceMetasChanged = pyqtSignal()
     currentExperienceChanged = pyqtSignal()
     statusChanged = pyqtSignal()
+    experienceStateChanged = pyqtSignal()
 
     def __init__(self, experience_manager: ExperienceManager | None = None) -> None:
         super().__init__()
@@ -60,6 +62,10 @@ class AppController(QObject):
         self._experience_metas: list[dict[str, object]] = (
             experience_manager.all_metas() if experience_manager is not None else []
         )
+        self._experience_state: dict[str, object] = {}
+        self._render_timer = QTimer(self)
+        self._render_timer.setInterval(33)  # ~30Hz
+        self._render_timer.timeout.connect(self._poll_render_state)
 
         bus = SignalBus.instance()
         bus.vision_frame_ready.connect(self._on_vision_frame)
@@ -106,6 +112,10 @@ class AppController(QObject):
     @pyqtProperty(str, notify=statusChanged)
     def status(self) -> str:
         return self._status
+
+    @pyqtProperty("QVariant", notify=experienceStateChanged)
+    def experienceState(self) -> Any:
+        return self._experience_state
 
     # ---- Public slots invokable từ QML ----
 
@@ -161,14 +171,33 @@ class AppController(QObject):
         self._status = "playing"
         self.currentExperienceChanged.emit()
         self.statusChanged.emit()
+        self._render_timer.start()
 
     @pyqtSlot(str, dict)
     def _on_experience_ended(self, exp_id: str, summary: dict[str, object]) -> None:
         _ = exp_id, summary
+        self._render_timer.stop()
         self._current_experience = ""
         self._status = "hub"
+        self._experience_state = {}
         self.currentExperienceChanged.emit()
         self.statusChanged.emit()
+        self.experienceStateChanged.emit()
+
+    def _poll_render_state(self) -> None:
+        if self._experience_manager is None:
+            return
+        inst = self._experience_manager.current_instance
+        if inst is None:
+            return
+        try:
+            new_state = inst.render_state()
+        except Exception as e:
+            logger.warning(f"render_state() raised: {e}")
+            return
+        if new_state != self._experience_state:
+            self._experience_state = new_state
+            self.experienceStateChanged.emit()
 
     @pyqtSlot(object)
     def _on_vision_frame(self, frame: VisionFrame) -> None:
