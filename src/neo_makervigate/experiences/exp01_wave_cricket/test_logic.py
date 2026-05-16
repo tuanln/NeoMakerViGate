@@ -287,3 +287,43 @@ def test_flock_multiplier_applies_to_score() -> None:
     # Mỗi cricket flown trong window bonus → 15 điểm thay 10
     assert crickets_flown > 0
     assert score >= 15 * crickets_flown
+
+
+def test_render_state_schema_complete(
+    exp_with_clock: tuple[WaveCricketExperience, _FakeClock],
+) -> None:
+    """render_state() phải trả đủ 9 key spec định."""
+    exp, _ = exp_with_clock
+    state = exp.render_state()
+    expected_keys = {
+        "phase",
+        "elapsed_in_phase",
+        "remaining",
+        "score",
+        "crickets_flown",
+        "flock_bonus_active",
+        "wave_count_total",
+        "wrist",
+        "crickets",
+    }
+    assert set(state.keys()) == expected_keys
+
+
+def test_completion_summary_after_gameplay() -> None:
+    """completion_summary chứa completed=True, score, wave_count_total."""
+    import random as _r
+    clock = _FakeClock(0.0)
+    exp = WaveCricketExperience(clock=clock, rng=_r.Random(42))
+    exp.on_enter()
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_frame(wrist_x=0.5, wrist_y=0.1))
+    exp.on_gesture("WAVE")
+    clock.advance(2.0)
+    exp.on_vision_frame(_make_frame(wrist_x=0.5, wrist_y=0.1))
+    # Advance to RESULT (60.1s thêm sau PLAYING)
+    clock.advance(58.0)
+    exp.on_vision_frame(_make_frame(wrist_x=0.5, wrist_y=0.1))
+    summary = exp.completion_summary()
+    assert summary["completed"] is True
+    assert summary["score"] >= 10
+    assert summary["wave_count_total"] == 1
