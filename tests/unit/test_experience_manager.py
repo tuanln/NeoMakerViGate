@@ -174,3 +174,48 @@ def test_watchdog_unloads_slow_plugin(qapp) -> None:
         bus.vision_frame_ready.emit(_make_frame())
 
     assert mgr.current_id is None  # watchdog đã unload
+
+
+def test_phase_done_triggers_auto_unload(qapp) -> None:
+    """Plugin có render_state()['phase']=='done' phải auto-unload qua _on_vision_frame."""
+
+    class _DoneExp(BaseExperience):
+        meta = ExperienceMeta(
+            id="done_test",
+            title="DoneTest",
+            subtitle="",
+            age_min=4,
+            age_max=14,
+            vision_modules=("hands",),
+        )
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.frame_count = 0
+
+        def get_qml_path(self) -> str:
+            return ""
+
+        def on_vision_frame(self, frame: VisionFrame) -> None:
+            self.frame_count += 1
+
+        def render_state(self) -> dict[str, object]:
+            # Hết phase == "playing" lần đầu; lần thứ 2 trả "done" → auto-unload
+            if self.frame_count >= 2:
+                return {"phase": "done"}
+            return {"phase": "playing"}
+
+        def completion_summary(self) -> dict[str, object]:
+            return {"completed": True, "score": 42}
+
+    mgr = ExperienceManager(registry={"done_test": _DoneExp})
+    mgr.load("done_test")
+    assert mgr.current_id == "done_test"
+
+    bus = SignalBus.instance()
+    # Frame 1 — instance still PLAYING
+    bus.vision_frame_ready.emit(VisionFrame(timestamp=datetime.now(), width=640, height=360))
+    assert mgr.current_id == "done_test"
+    # Frame 2 — instance trả "done" → manager auto-unload
+    bus.vision_frame_ready.emit(VisionFrame(timestamp=datetime.now(), width=640, height=360))
+    assert mgr.current_id is None

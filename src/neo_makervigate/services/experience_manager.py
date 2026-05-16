@@ -146,6 +146,17 @@ class ExperienceManager:
             logger.exception(f"Plugin {self._current_id} raised in on_vision_frame: {e}")
             self.unload({"crash": True, "where": "on_vision_frame", "error": str(e)})
             return
+        # Auto-end when plugin signals completion via render_state phase==done
+        if self._current_instance is not None:
+            try:
+                state = self._current_instance.render_state()
+                if isinstance(state, dict) and state.get("phase") == "done":
+                    summary_fn = getattr(self._current_instance, "completion_summary", None)
+                    summary = summary_fn() if callable(summary_fn) else {"completed": True}
+                    self.unload(summary)
+                    return
+            except Exception as e:
+                logger.warning(f"render_state check failed: {e}")
         elapsed_ms = (time.perf_counter() - start) * 1000
         if elapsed_ms > WATCHDOG_THRESHOLD_MS:
             self._consecutive_slow_frames += 1
