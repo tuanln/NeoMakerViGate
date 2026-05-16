@@ -16,6 +16,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from loguru import logger
+
 from neo_makervigate.core.models import ExperienceMeta, VisionFrame
 from neo_makervigate.experiences.experience_base import BaseExperience
 from neo_makervigate.utils.landmark_math import (
@@ -118,6 +120,7 @@ class YogaRobotExperience(BaseExperience):
 
     def on_enter(self) -> None:
         now = self._clock()
+        logger.info(f"YogaRobot: on_enter ({len(self._poses)} poses loaded)")
         self._phase = Phase.INTRO
         self._phase_started_at = now
         self._last_step_at = now
