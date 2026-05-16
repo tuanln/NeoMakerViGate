@@ -89,3 +89,32 @@ def extract_pose_angles(landmarks: list[Landmark]) -> dict[str, float]:
             landmarks[HIP_R], landmarks[KNEE_R], landmarks[ANKLE_R]
         ),
     }
+
+
+def pose_similarity_score(
+    current: dict[str, float],
+    target: dict[str, float],
+    tolerance: dict[str, float],
+) -> float:
+    """Score 0-100 dựa trên mean absolute error normalized by tolerance.
+
+    Cho mỗi joint key trong target:
+        diff = abs(current[joint] - target[joint])
+        group = joint.split("_")[1]  # "shoulder" | "elbow" | "hip" | "knee"
+        joint_score = max(0, 100 - 100 * diff / (2 * tolerance[group]))
+
+    Returns mean joint_score over target keys (0 nếu target rỗng).
+    """
+    if not target:
+        return 0.0
+    scores: list[float] = []
+    for joint, target_angle in target.items():
+        if joint not in current:
+            scores.append(0.0)
+            continue
+        group = joint.split("_", 1)[1]  # "left_shoulder" → "shoulder"
+        tol = tolerance.get(group, 20.0)
+        diff = abs(current[joint] - target_angle)
+        joint_score = max(0.0, 100.0 - 100.0 * diff / (2.0 * tol))
+        scores.append(joint_score)
+    return sum(scores) / len(scores)

@@ -85,3 +85,56 @@ def test_extract_pose_angles_t_pose_synth() -> None:
     assert angles["right_hip"] > 160
     assert angles["left_knee"] > 160
     assert angles["right_knee"] > 160
+
+
+def test_pose_similarity_score_perfect_match_returns_100() -> None:
+    from neo_makervigate.utils.landmark_math import pose_similarity_score
+
+    current = {
+        "left_shoulder": 90.0, "right_shoulder": 90.0,
+        "left_elbow": 180.0, "right_elbow": 180.0,
+    }
+    target = dict(current)
+    tolerance = {"shoulder": 20, "elbow": 15, "hip": 15, "knee": 30}
+    assert pose_similarity_score(current, target, tolerance) == 100.0
+
+
+def test_pose_similarity_score_off_by_tolerance_returns_around_50() -> None:
+    from neo_makervigate.utils.landmark_math import pose_similarity_score
+
+    # 1 joint off by exactly tolerance → score for that joint = 100 - 100 * tol/(2*tol) = 50
+    current = {"left_shoulder": 110.0}  # off by 20
+    target = {"left_shoulder": 90.0}
+    tolerance = {"shoulder": 20, "elbow": 15, "hip": 15, "knee": 30}
+    score = pose_similarity_score(current, target, tolerance)
+    assert 45 <= score <= 55, f"expected ~50, got {score}"
+
+
+def test_pose_similarity_score_off_by_2tolerance_returns_0() -> None:
+    from neo_makervigate.utils.landmark_math import pose_similarity_score
+
+    # off by 2x tolerance → 100 - 100 * 2tol/(2tol) = 0
+    current = {"left_shoulder": 130.0}  # off by 40 from 90
+    target = {"left_shoulder": 90.0}
+    tolerance = {"shoulder": 20, "elbow": 15, "hip": 15, "knee": 30}
+    score = pose_similarity_score(current, target, tolerance)
+    assert score == 0.0
+
+
+def test_pose_similarity_score_iterates_only_target_keys() -> None:
+    """Target có 6 keys (no knee), current có 8 keys → chỉ score 6 keys của target."""
+    from neo_makervigate.utils.landmark_math import pose_similarity_score
+
+    current = {
+        "left_shoulder": 90.0, "right_shoulder": 90.0,
+        "left_elbow": 180.0, "right_elbow": 180.0,
+        "left_hip": 180.0, "right_hip": 180.0,
+        "left_knee": 90.0, "right_knee": 90.0,  # extra — không có trong target
+    }
+    target = {
+        "left_shoulder": 90.0, "right_shoulder": 90.0,
+        "left_elbow": 180.0, "right_elbow": 180.0,
+        "left_hip": 180.0, "right_hip": 180.0,
+    }
+    tolerance = {"shoulder": 20, "elbow": 15, "hip": 15, "knee": 30}
+    assert pose_similarity_score(current, target, tolerance) == 100.0
