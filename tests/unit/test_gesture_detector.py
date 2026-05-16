@@ -74,9 +74,54 @@ def test_wave_amplitude_too_small_no_trigger() -> None:
 
 def test_wave_single_crossing_no_trigger() -> None:
     det = GestureDetector()
-    # 0.25 cycle: chỉ qua baseline 1 lần (baseline → peak → baseline)
+    # 0.25 cycle: chỉ đi lên 1/4 sóng (0 → đỉnh), chỉ có 1 crossing qua mean → chưa đủ threshold 2
     frames = _make_sine_frames(cycles=0.25, amplitude=0.1, fps=30, duration=1.0)
     gestures: list[str] = []
     for f in frames:
         gestures.extend(det.feed(f))
+    assert gestures == []
+
+
+def test_wave_cooldown_blocks_immediate_retrigger() -> None:
+    det = GestureDetector()
+    # Vẫy đủ trigger
+    frames1 = _make_sine_frames(cycles=2, amplitude=0.1, fps=30, duration=1.0, start_t=0.0)
+    gestures: list[str] = []
+    for f in frames1:
+        gestures.extend(det.feed(f))
+    first_count = gestures.count("WAVE")
+    assert first_count >= 1
+
+    # Vẫy lại ngay trong 0.05s (< 0.4s cooldown) — cooldown phải chặn
+    # frames1 kết thúc ~1.0s, last WAVE ~0.67s → cooldown_until ~1.067s
+    # frames2 start 1.0s, duration 0.05s → kết thúc 1.05s, hoàn toàn trong cooldown
+    frames2 = _make_sine_frames(cycles=2, amplitude=0.1, fps=30, duration=0.05, start_t=1.0)
+    for f in frames2:
+        gestures.extend(det.feed(f))
+    assert gestures.count("WAVE") == first_count
+
+
+def test_wave_after_cooldown_triggers_again() -> None:
+    det = GestureDetector()
+    # Vẫy lần 1
+    for f in _make_sine_frames(cycles=2, amplitude=0.1, fps=30, duration=1.0, start_t=0.0):
+        det.feed(f)
+    # Đợi qua cooldown (1.0s start_t + 0.5s gap = 1.5s)
+    # Vẫy lần 2 với pattern mới start_t=1.5 (qua 0.4s cooldown)
+    gestures: list[str] = []
+    for f in _make_sine_frames(cycles=2, amplitude=0.1, fps=30, duration=1.0, start_t=1.5):
+        gestures.extend(det.feed(f))
+    assert "WAVE" in gestures
+
+
+def test_reset_clears_buffer() -> None:
+    det = GestureDetector()
+    # Push static idle frames (wrist đứng yên)
+    for i in range(15):
+        det.feed(_make_frame(0.5, i / 30.0))
+    det.reset()
+    # Push thêm static frames nữa — vì reset đã clear, buffer trống, không có pattern để trigger
+    gestures: list[str] = []
+    for i in range(15):
+        gestures.extend(det.feed(_make_frame(0.5, 0.5 + i / 30.0)))
     assert gestures == []
