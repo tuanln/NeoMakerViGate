@@ -35,6 +35,7 @@ dependencies = [
     "loguru>=0.7",
     "tomli>=2.0 ; python_version < '3.11'",
     "requests>=2.31",
+    "scipy>=1.11",
 ]
 
 [project.optional-dependencies]
@@ -112,7 +113,7 @@ warn_unused_ignores = true
 plugins = []
 
 [[tool.mypy.overrides]]
-module = ["mediapipe.*", "cv2.*", "qrcode.*", "PyQt6.*"]
+module = ["mediapipe.*", "cv2.*", "qrcode.*", "PyQt6.*", "scipy.*"]
 ignore_missing_imports = true
 
 # pyqtProperty decorator chưa có type stub đầy đủ — disable strict cho service layer
