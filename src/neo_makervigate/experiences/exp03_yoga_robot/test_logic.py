@@ -294,3 +294,60 @@ def test_result_transitions_to_done_after_3s(
     clock.advance(3.1)
     exp.on_vision_frame(_make_empty_frame())
     assert exp.render_state()["phase"] == Phase.DONE.value
+
+
+def test_render_state_schema_complete(
+    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
+) -> None:
+    exp, _ = exp_with_clock
+    state = exp.render_state()
+    expected_keys = {
+        "phase", "elapsed_in_phase",
+        "pose_index", "pose_count", "current_pose",
+        "score", "max_score_in_attempt", "match_threshold",
+        "hold_progress", "hold_required",
+        "elapsed_in_pose", "show_hint", "stuck_skip_at",
+        "completed_poses", "total_score", "best_pose_id",
+        "pose_landmarks_present",
+    }
+    assert set(state.keys()) == expected_keys
+
+
+def test_best_pose_id_is_max_score(
+    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
+) -> None:
+    exp, clock = exp_with_clock
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_empty_frame())  # POSING pose 0
+
+    # Complete pose 0 với T-pose hold 4s
+    for _ in range(8):
+        clock.advance(0.5)
+        exp.on_vision_frame(_make_pose_frame())
+    # Skip pose 1
+    clock.advance(45.1)
+    exp.on_vision_frame(_make_empty_frame())
+    state = exp.render_state()
+    # Best = T_POSE (chỉ pose đó có final_score > 0)
+    assert state["best_pose_id"] == "T_POSE"
+
+
+def test_completion_summary_after_game_end(
+    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
+) -> None:
+    exp, clock = exp_with_clock
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_empty_frame())  # POSING
+
+    # Complete pose 0 với T-pose
+    for _ in range(8):
+        clock.advance(0.5)
+        exp.on_vision_frame(_make_pose_frame())
+    # Skip remaining 4 poses
+    for _ in range(4):
+        clock.advance(45.1)
+        exp.on_vision_frame(_make_empty_frame())
+    summary = exp.completion_summary()
+    assert summary["completed"] is True
+    assert cast(int, summary["score"]) > 0
+    assert summary["poses_completed"] == 5

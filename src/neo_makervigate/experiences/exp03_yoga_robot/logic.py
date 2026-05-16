@@ -242,10 +242,13 @@ class YogaRobotExperience(BaseExperience):
         return best.pose_id
 
     def completion_summary(self) -> dict[str, Any]:
+        completed = [a for a in self._attempts if a.matched_complete or a.skipped]
         return {
             "completed": True,
-            "score": 0,
-            "poses_completed": 0,
+            "score": sum(a.final_score for a in completed),
+            "poses_completed": len(completed),
+            "best_pose_id": self._best_pose_id(),
+            "skipped_count": sum(1 for a in completed if a.skipped),
         }
 
     def _step_phase(self, now: float) -> None:
