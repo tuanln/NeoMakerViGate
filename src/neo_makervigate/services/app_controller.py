@@ -79,6 +79,7 @@ class AppController(QObject):
         bus.experience_started.connect(self._on_experience_started)
         bus.experience_ended.connect(self._on_experience_ended)
         bus.photo_captured.connect(self._on_photo_captured)
+        bus.photo_caption_ready.connect(self._on_photo_caption_ready)
 
     # ---- Properties exposed to QML ----
 
@@ -218,12 +219,22 @@ class AppController(QObject):
         self._photo_result = {
             "photo_id": result.photo_id,
             "original_path": str(result.original_path) if result.original_path else "",
+            "composite_path": str(result.composite_path) if result.composite_path else "",
             "qr_path": str(result.qr_path) if result.qr_path else "",
             "download_url": result.download_url or "",
             "experience_id": result.experience_id,
+            "caption": "",  # populated by photo_caption_ready signal
         }
         self.photoResultChanged.emit()
         self.photoReviewRequested.emit()
+
+    @pyqtSlot(str, str)
+    def _on_photo_caption_ready(self, photo_id: str, caption: str) -> None:
+        if self._photo_result.get("photo_id") != photo_id:
+            return
+        self._photo_result = dict(self._photo_result)
+        self._photo_result["caption"] = caption
+        self.photoResultChanged.emit()
 
     @pyqtSlot(object)
     def _on_vision_frame(self, frame: VisionFrame) -> None:

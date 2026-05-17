@@ -118,3 +118,57 @@ def test_app_controller_does_not_emit_review_on_failed_capture(qapp) -> None:
 def test_photo_result_empty_by_default(qapp) -> None:
     ctrl = AppController(experience_manager=None)
     assert ctrl.photoResult == {}
+
+
+def test_photo_caption_ready_updates_photo_result(qapp) -> None:
+    """When photo_caption_ready signal fires, photoResult dict gets caption populated."""
+    from pathlib import Path
+
+    from neo_makervigate.core.models import PhotoResult
+    from neo_makervigate.utils.signal_bus import SignalBus
+
+    ctrl = AppController(experience_manager=None)
+    # First, simulate photo_captured to set photoResult base
+    result = PhotoResult(
+        success=True,
+        photo_id="photo_abc",
+        original_path=Path("/tmp/orig.jpg"),
+        qr_path=Path("/tmp/qr.png"),
+        download_url="http://x/photo_abc/original.jpg",
+        experience_id="exp06_photo_booth",
+    )
+    SignalBus.instance().photo_captured.emit(result)
+    qapp.processEvents()
+    assert ctrl.photoResult["caption"] == ""
+
+    # Now fire photo_caption_ready
+    changes: list[bool] = []
+    ctrl.photoResultChanged.connect(lambda: changes.append(True))
+    SignalBus.instance().photo_caption_ready.emit("photo_abc", "Em đứng cười tươi! 🌞")
+    qapp.processEvents()
+    assert ctrl.photoResult["caption"] == "Em đứng cười tươi! 🌞"
+    assert len(changes) >= 1
+
+
+def test_photo_caption_ready_ignored_for_different_photo_id(qapp) -> None:
+    """Mismatched photo_id → caption not applied."""
+    from pathlib import Path
+
+    from neo_makervigate.core.models import PhotoResult
+    from neo_makervigate.utils.signal_bus import SignalBus
+
+    ctrl = AppController(experience_manager=None)
+    result = PhotoResult(
+        success=True,
+        photo_id="photo_xyz",
+        original_path=Path("/tmp/o.jpg"),
+        qr_path=Path("/tmp/q.png"),
+        download_url="http://x",
+        experience_id="exp",
+    )
+    SignalBus.instance().photo_captured.emit(result)
+    qapp.processEvents()
+
+    SignalBus.instance().photo_caption_ready.emit("photo_other", "wrong caption")
+    qapp.processEvents()
+    assert ctrl.photoResult["caption"] == ""

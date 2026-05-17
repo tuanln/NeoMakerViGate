@@ -32,6 +32,7 @@ class SignalBus(QObject):
     # ── Photo ───────────────────────────────────────────────────
     photo_capture_requested = pyqtSignal(dict)
     photo_captured = pyqtSignal(object)  # PhotoResult (P5)
+    photo_caption_ready = pyqtSignal(str, str)  # photo_id, caption text (P6)
 
     # ── Qwen ────────────────────────────────────────────────────
     qwen_request_started = pyqtSignal(object)  # dict with image_path, prompt, max_tokens
