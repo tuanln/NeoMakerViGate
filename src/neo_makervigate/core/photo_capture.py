@@ -48,3 +48,43 @@ class PhotoCapture:
         if not ok:
             raise RuntimeError(f"cv2.imwrite failed: {path}")
         return path
+
+    def save_composite(
+        self,
+        frame_bgr: np.ndarray[Any, Any],
+        mask: np.ndarray[Any, Any],
+        background_path: Path,
+        photo_dir: Path,
+    ) -> Path:
+        """Composite foreground (trẻ) vào background, lưu composite.jpg.
+
+        Soft mask + Gaussian blur edges để cạnh mượt.
+        - frame_bgr: BGR HxWx3 uint8
+        - mask: float32 HxW with values [0..1] (1 = person, 0 = background)
+        - background_path: PNG/JPG to use as background
+        - photo_dir: output directory
+        """
+        if not photo_dir.exists():
+            raise FileNotFoundError(f"photo_dir does not exist: {photo_dir}")
+        h, w = frame_bgr.shape[:2]
+        bg = cv2.imread(str(background_path))
+        if bg is None:
+            raise FileNotFoundError(f"background not found: {background_path}")
+        bg = cv2.resize(bg, (w, h))
+
+        # Resize mask to frame dimensions if needed
+        if mask.shape != (h, w):
+            mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_LINEAR)
+        # Soft edges via Gaussian blur
+        mask_blurred = cv2.GaussianBlur(mask, (15, 15), 0).astype(np.float32)
+        mask_3ch = np.stack([mask_blurred] * 3, axis=-1)
+
+        fg = frame_bgr.astype(np.float32)
+        bg_f = bg.astype(np.float32)
+        composite = (fg * mask_3ch + bg_f * (1 - mask_3ch)).astype(np.uint8)
+
+        path = photo_dir / "composite.jpg"
+        ok = cv2.imwrite(str(path), composite, [cv2.IMWRITE_JPEG_QUALITY, JPG_QUALITY])
+        if not ok:
+            raise RuntimeError(f"cv2.imwrite failed: {path}")
+        return path

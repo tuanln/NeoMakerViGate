@@ -71,3 +71,63 @@ def test_save_original_jpg_size_reasonable(tmp_path: Path) -> None:
     path = pc.save_original(frame, photo_dir)
     size = path.stat().st_size
     assert 1000 < size < 100_000, f"JPG size {size} out of expected range"
+
+
+def test_save_composite_with_full_mask_returns_foreground(tmp_path: Path) -> None:
+    """Mask all 1 (full foreground) → composite ≈ foreground frame."""
+    import cv2
+    pc = PhotoCapture(base_dir=tmp_path)
+    photo_dir = pc.make_photo_dir("photo_t_full")
+    fg = np.zeros((360, 640, 3), dtype=np.uint8)
+    fg[:, :, 2] = 255  # red (BGR)
+    bg_path = tmp_path / "bg.png"
+    bg = np.zeros((360, 640, 3), dtype=np.uint8)
+    bg[:, :, 0] = 255  # blue
+    cv2.imwrite(str(bg_path), bg)
+    mask = np.ones((360, 640), dtype=np.float32)
+
+    path = pc.save_composite(fg, mask, bg_path, photo_dir)
+    assert path == photo_dir / "composite.jpg"
+    assert path.exists()
+    out = cv2.imread(str(path))
+    assert out[180, 320, 2] > 200, f"expected red center, got BGR={out[180, 320]}"
+    assert out[180, 320, 0] < 50, f"expected no blue, got BGR={out[180, 320]}"
+
+
+def test_save_composite_with_zero_mask_returns_background_only(tmp_path: Path) -> None:
+    """Mask all 0 (no foreground) → composite ≈ background."""
+    import cv2
+    pc = PhotoCapture(base_dir=tmp_path)
+    photo_dir = pc.make_photo_dir("photo_t_zero")
+    fg = np.zeros((360, 640, 3), dtype=np.uint8)
+    fg[:, :, 2] = 255
+    bg_path = tmp_path / "bg2.png"
+    bg = np.zeros((360, 640, 3), dtype=np.uint8)
+    bg[:, :, 0] = 255
+    cv2.imwrite(str(bg_path), bg)
+    mask = np.zeros((360, 640), dtype=np.float32)
+
+    path = pc.save_composite(fg, mask, bg_path, photo_dir)
+    out = cv2.imread(str(path))
+    assert out[180, 320, 0] > 200
+    assert out[180, 320, 2] < 50
+
+
+def test_save_composite_writes_jpg(tmp_path: Path) -> None:
+    """Composite file is valid JPG."""
+    import cv2
+    pc = PhotoCapture(base_dir=tmp_path)
+    photo_dir = pc.make_photo_dir("photo_t_jpg")
+    fg = np.zeros((360, 640, 3), dtype=np.uint8)
+    fg[:, :, 1] = 200
+    bg_path = tmp_path / "bg3.png"
+    bg = np.zeros((360, 640, 3), dtype=np.uint8)
+    bg[:, :, 1] = 100
+    cv2.imwrite(str(bg_path), bg)
+    mask = np.ones((360, 640), dtype=np.float32) * 0.5
+
+    path = pc.save_composite(fg, mask, bg_path, photo_dir)
+    assert path.exists()
+    with open(path, "rb") as f:
+        header = f.read(3)
+    assert header[:3] == b"\xff\xd8\xff"
