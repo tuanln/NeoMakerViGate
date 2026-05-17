@@ -34,7 +34,7 @@ class SignalBus(QObject):
     photo_captured = pyqtSignal(object)  # PhotoResult (P5)
 
     # ── Qwen ────────────────────────────────────────────────────
-    qwen_request_started = pyqtSignal(str)
+    qwen_request_started = pyqtSignal(object)  # dict with image_path, prompt, max_tokens
     qwen_response_ready = pyqtSignal(str)
     qwen_failed = pyqtSignal(str)
 
