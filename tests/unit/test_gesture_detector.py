@@ -137,3 +137,88 @@ def test_reset_clears_buffer() -> None:
     for f in after:
         gestures.extend(det.feed(f))  # Only 5 new samples — below minimum
     assert gestures == []  # Buffer cleared → 5 < 8 → no trigger possible
+
+
+def _make_hand_v_sign(wrist_x: float = 0.5, wrist_y: float = 0.5) -> list[Landmark]:
+    """Synthesize 21-landmark hand in V-sign pose.
+
+    Index + middle extended upward (tip far from wrist), ring + pinky curled (tip close).
+    """
+    L = [Landmark(x=wrist_x, y=wrist_y) for _ in range(21)]
+    L[0] = Landmark(x=wrist_x, y=wrist_y)
+    # Index extended: tip 0.20 above wrist, pip 0.10 above
+    L[5] = Landmark(x=wrist_x - 0.03, y=wrist_y - 0.05)
+    L[6] = Landmark(x=wrist_x - 0.03, y=wrist_y - 0.10)
+    L[7] = Landmark(x=wrist_x - 0.03, y=wrist_y - 0.15)
+    L[8] = Landmark(x=wrist_x - 0.03, y=wrist_y - 0.20)
+    # Middle extended: tip 0.22 above
+    L[9] = Landmark(x=wrist_x + 0.01, y=wrist_y - 0.05)
+    L[10] = Landmark(x=wrist_x + 0.01, y=wrist_y - 0.11)
+    L[11] = Landmark(x=wrist_x + 0.01, y=wrist_y - 0.16)
+    L[12] = Landmark(x=wrist_x + 0.01, y=wrist_y - 0.22)
+    # Ring curled: tip CLOSER to wrist than pip
+    L[13] = Landmark(x=wrist_x + 0.04, y=wrist_y - 0.05)
+    L[14] = Landmark(x=wrist_x + 0.04, y=wrist_y - 0.07)
+    L[15] = Landmark(x=wrist_x + 0.04, y=wrist_y - 0.06)
+    L[16] = Landmark(x=wrist_x + 0.04, y=wrist_y - 0.04)
+    # Pinky curled similarly
+    L[17] = Landmark(x=wrist_x + 0.07, y=wrist_y - 0.04)
+    L[18] = Landmark(x=wrist_x + 0.07, y=wrist_y - 0.06)
+    L[19] = Landmark(x=wrist_x + 0.07, y=wrist_y - 0.05)
+    L[20] = Landmark(x=wrist_x + 0.07, y=wrist_y - 0.03)
+    return L
+
+
+def _make_hand_open_palm(wrist_x: float = 0.5, wrist_y: float = 0.5) -> list[Landmark]:
+    """All 5 fingers extended."""
+    L = [Landmark(x=wrist_x, y=wrist_y) for _ in range(21)]
+    for finger_offset, mcp_idx in [(-0.06, 5), (-0.02, 9), (0.02, 13), (0.06, 17)]:
+        L[mcp_idx] = Landmark(x=wrist_x + finger_offset, y=wrist_y - 0.05)
+        L[mcp_idx + 1] = Landmark(x=wrist_x + finger_offset, y=wrist_y - 0.10)
+        L[mcp_idx + 2] = Landmark(x=wrist_x + finger_offset, y=wrist_y - 0.15)
+        L[mcp_idx + 3] = Landmark(x=wrist_x + finger_offset, y=wrist_y - 0.20)
+    return L
+
+
+def _make_hand_point(wrist_x: float = 0.5, wrist_y: float = 0.5) -> list[Landmark]:
+    """Only index extended, others curled."""
+    L = [Landmark(x=wrist_x, y=wrist_y) for _ in range(21)]
+    L[5] = Landmark(x=wrist_x, y=wrist_y - 0.05)
+    L[6] = Landmark(x=wrist_x, y=wrist_y - 0.10)
+    L[7] = Landmark(x=wrist_x, y=wrist_y - 0.15)
+    L[8] = Landmark(x=wrist_x, y=wrist_y - 0.20)
+    L[9] = Landmark(x=wrist_x + 0.03, y=wrist_y - 0.05)
+    L[10] = Landmark(x=wrist_x + 0.03, y=wrist_y - 0.07)
+    L[12] = Landmark(x=wrist_x + 0.03, y=wrist_y - 0.04)
+    L[13] = Landmark(x=wrist_x + 0.05, y=wrist_y - 0.05)
+    L[14] = Landmark(x=wrist_x + 0.05, y=wrist_y - 0.07)
+    L[16] = Landmark(x=wrist_x + 0.05, y=wrist_y - 0.04)
+    L[17] = Landmark(x=wrist_x + 0.07, y=wrist_y - 0.05)
+    L[18] = Landmark(x=wrist_x + 0.07, y=wrist_y - 0.07)
+    L[20] = Landmark(x=wrist_x + 0.07, y=wrist_y - 0.04)
+    return L
+
+
+def _frame_with_hand(hand: list[Landmark], t: float = 0.0) -> VisionFrame:
+    base = datetime(2026, 1, 1) + timedelta(seconds=t)
+    vf = VisionFrame(timestamp=base, width=1280, height=720)
+    vf.hands = [hand]
+    return vf
+
+
+def test_v_sign_index_middle_extended_returns_v_sign() -> None:
+    det = GestureDetector()
+    result = det.feed(_frame_with_hand(_make_hand_v_sign(), t=0.0))
+    assert "V_SIGN" in result
+
+
+def test_v_sign_all_fingers_extended_no_trigger() -> None:
+    det = GestureDetector()
+    result = det.feed(_frame_with_hand(_make_hand_open_palm(), t=0.0))
+    assert "V_SIGN" not in result
+
+
+def test_v_sign_only_index_no_trigger() -> None:
+    det = GestureDetector()
+    result = det.feed(_frame_with_hand(_make_hand_point(), t=0.0))
+    assert "V_SIGN" not in result
