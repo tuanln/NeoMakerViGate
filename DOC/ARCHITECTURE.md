@@ -1,11 +1,31 @@
 # NeoMakerViGate — Tài liệu Kiến trúc & Kế hoạch Triển khai
 
-> **Phiên bản:** 0.1.0 (Design)
+> **Phiên bản:** 0.1.0 (Design — 2026-05-14)
 > **Tổ chức:** Maker Việt × Dế Foundation — ThingEdu
-> **Ngày soạn:** 2026-05-14
 > **Áp dụng cho:** Trạm 1 (Cổng Vào) — Cổng Làng Maker, Làng Maker @ FPT Shop
 > **Tham chiếu kiến trúc:** NeoStopMotion (PyQt6 + QML + SignalBus + ShareServer), NEOSTEM (QML Singletons), NEO_CODE (PyQt6 + Worker Thread)
 > **Tham chiếu sản phẩm:** Storyboard "Trò Chơi Cổng Làng" v0.1
+
+---
+
+## 0. Decision Log — Deltas vs Design (2026-05-17)
+
+Document này viết ở P0 conceptual phase. Implementation P3-P6 đã thay đổi vài quyết định. **Code is canonical**, doc này preserved as historical reference.
+
+| Topic | Design (P0) | Implementation | Reason |
+|---|---|---|---|
+| Qwen model | Qwen 3.5 (0.8B / 4B) | **Qwen 2.5-VL-2B-Instruct-Q4_K_M GGUF** | Qwen 3.5 release chưa có (status 2026-02-03 chỉ Qwen 2.5/3 series). Qwen 2.5-VL có GGUF qua `bartowski/Qwen2.5-VL-2B-Instruct-GGUF` |
+| Qwen backend | Hybrid local+API (DashScope) | **Local only** (llama-cpp-python) | User chốt P6 brainstorm. Offline-first phù hợp FPT Shop WiFi chập chờn. DashScope APIBackend out-of-scope post-pilot. |
+| Pose scoring (exp03) | Cosine similarity | **Joint-angle similarity** (8 joints × tolerance per group) | P4 brainstorm: angle-based robust hơn với scale + vị trí trẻ vs người lớn. `utils/landmark_math.py` không có cosine. |
+| exp03 capture trigger | Manual button hoặc auto-photo cuối game | **Auto-capture vào RESULT phase** | P5 brainstorm. ExperienceManager Phase.DONE → emit `photo_capture_requested` (P5 mechanism). |
+| exp06 capture trigger | Per design § 7.5 (gesture) | **V_SIGN hold 0.5s → countdown 3s → emit photo_capture_requested** | P6 brainstorm. `auto_capture_on_done=False` để plugin self-orchestrate (T8). |
+| Backgrounds | 4 nền PNG transparent | 4 nền PNG opaque procedural Pillow (sky/ground gradient + simplified silhouettes) | P6 brainstorm: no designer asset needed; user thay PNG sau pilot dễ. |
+| New signals (post-design) | — | `photo_capture_requested(dict)`, `photo_captured(PhotoResult)`, `photo_caption_ready(str, str)`, `experience_state` polling 30Hz | Added P5/P6 to support cross-experience photo + caption flow. |
+| `BaseExperience.auto_capture_on_done` | — | `ClassVar[bool] = True`; exp06 overrides False | P6 T8. ExperienceManager checks before auto-emitting capture request. |
+| Tests pattern | unit only | unit + colocated `expN/test_logic.py` (pyproject `testpaths = ["tests", "src"]`) | P3 T5 fix: plugin tests live with plugin code, registry pattern works. |
+| Storage | `/home/maker/makervigate/photos/` | `~/makervigate/photos/` (cross-platform Mac+Linux) | P5 brainstorm. LRU cleanup 200MB theo folder mtime. |
+
+Specs + plans for each phase: `docs/superpowers/specs/` + `docs/superpowers/plans/`.
 
 ---
 
