@@ -202,34 +202,36 @@ make lint     # ruff sạch
 
 ---
 
-## P6 — Qwen + exp06 Photo Booth (tuần 7)
+## P6 — Qwen + exp06 Photo Booth (tuần 7) ✅ DONE
 
-**Mục tiêu:** Trải nghiệm flagship MVP — Photo Booth với caption tiếng Việt.
+**Achievement (2026-05-17):** Flagship MVP experience. V_SIGN gesture (pose-based detection, separate cooldown), Selfie Seg enable trong VisionEngine + VisionFrame.selfie_mask + VisionWorker.latest_vision_frame property, PhotoCapture.save_composite (soft mask Gaussian blur), QwenLocalBackend (llama-cpp-python + Qwen 2.5-VL-2B GGUF Q4_K_M lazy load, runtime_checkable Protocol), QwenService QThread wrapper với queue + poison pill stop, PhotoBoothExperience full game (INTRO 2s → SELECT POINT cycle + auto-advance 3s → STAGE V_SIGN hold 0.5s → COUNTDOWN 3s → PROCESSING + Qwen caption với timeout 12s fallback template → DONE), BaseExperience.auto_capture_on_done attr + ExperienceManager check (exp06 self-orchestrates capture), photo_caption_ready signal → AppController updates photoResult với composite_path + caption fields, PhotoReviewPage caption display, 4 procedural backgrounds (Sân Đình/Lũy Tre/Sân FGC/Sao Hỏa). 17 tasks TDD subagent-driven. 30+ P6 tests (141 total). ruff/mypy strict clean.
 
-### Spike S2 (ngày 1, 4h)
+**Mục tiêu (đạt):** Trải nghiệm flagship MVP — Photo Booth với caption tiếng Việt.
 
-Check HuggingFace có `Qwen/Qwen3.5-0.8B-Instruct-GGUF` chưa? Test llama.cpp inference trên Mac. Plan B: Qwen2-VL-2B + API only.
+### Spike S2 (chưa chạy — user manual)
+
+User chốt skip pre-flight; plan executed assuming Qwen 2.5-VL-2B works trên Mac M4. T17 manual smoke sẽ verify.
 
 ### Tasks
 
-- [ ] `core/qwen_client.py` — Protocol + `QwenLocalBackend` (llama-cpp-python) + `QwenAPIBackend` (DashScope)
-- [ ] `services/qwen_service.py` — async wrapper QThread
-- [ ] `experiences/exp06_photo_booth/logic.py` — chụp + composite + caption flow
-- [ ] `experiences/exp06_photo_booth/ui.qml` — chọn nền + countdown + preview
-- [ ] `experiences/exp06_photo_booth/backgrounds/` — 2 nền: Sân Đình, Lũy Tre (PNG transparent)
-- [ ] `experiences/exp06_photo_booth/prompts.toml` — system prompt sinh caption tiếng Việt
-- [ ] V_SIGN gesture → trigger chụp (không cần chạm màn hình)
-- [ ] Fallback: Qwen fail → caption mẫu có sẵn theo nền
+- [x] `core/qwen_client.py` — Protocol + `QwenLocalBackend` (llama-cpp-python). APIBackend (DashScope) out-of-scope (local-only decision)
+- [x] `services/qwen_service.py` — QThread wrapper
+- [x] `experiences/exp06_photo_booth/logic.py` — chụp + composite + caption flow
+- [x] `experiences/exp06_photo_booth/ui.qml` — chọn nền + countdown + preview
+- [x] `experiences/exp06_photo_booth/backgrounds/` — 4 nền procedural Pillow (Sân Đình + Lũy Tre + Sân FGC + Sao Hỏa)
+- [x] `experiences/exp06_photo_booth/prompts.toml` — system prompt + 4 fallback captions
+- [x] V_SIGN gesture → trigger chụp (extend GestureDetector)
+- [x] Fallback: Qwen fail/timeout → caption mẫu có sẵn theo nền
 
 ### Demo
 
-- Chơi Photo Booth → chọn Sân Đình → làm chữ V → countdown 3-2-1 → chụp → ghép nền → caption Qwen "Hôm nay một con dế nhỏ..." → QR → tải về
+- Chơi Photo Booth → chọn Sân Đình → làm chữ V (hold 0.5s) → countdown 3-2-1 → chụp → ghép nền (Selfie Seg + Gaussian blur edges) → caption Qwen (local 2.5-VL-2B) → QR → tải về
 
 ### Exit criteria
 
-- [ ] API mode caption < 4s
-- [ ] Local mode caption < 8s
-- [ ] Composite chất lượng OK (selfie mask không vỡ)
+- [~] API mode caption < 4s — N/A (local only)
+- [ ] Local mode caption < 8s — verify trong smoke test webcam thật
+- [ ] Composite chất lượng OK (selfie mask không vỡ) — verify trong smoke test
 
 ---
 
