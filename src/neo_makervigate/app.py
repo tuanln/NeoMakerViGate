@@ -25,12 +25,16 @@ from PyQt6.QtQml import QQmlApplicationEngine
 from neo_makervigate import __version__
 from neo_makervigate.config.settings import load_settings
 from neo_makervigate.core.gesture_detector import GestureDetector
+from neo_makervigate.core.photo_capture import DEFAULT_PHOTOS_DIR
+from neo_makervigate.core.share_server import ShareServer
 from neo_makervigate.core.vision_engine import VisionEngine, VisionSource
 from neo_makervigate.core.vision_simulator import VisionSimulator
 from neo_makervigate.core.vision_worker import VisionWorker
 from neo_makervigate.experiences.registry import discover_experiences
 from neo_makervigate.services.app_controller import AppController
 from neo_makervigate.services.experience_manager import ExperienceManager
+from neo_makervigate.services.photo_service import PhotoService
+from neo_makervigate.services.share_service import ShareService
 from neo_makervigate.ui.image_provider import CameraImageProvider
 from neo_makervigate.utils.logging_config import setup_logging
 from neo_makervigate.utils.signal_bus import SignalBus
@@ -73,6 +77,17 @@ def run(argv: list[str]) -> int:
     bus.vision_frame_ready.connect(gesture_detector.feed)
     bus.experience_ended.connect(lambda *_: gesture_detector.reset())
 
+    # P5: Share/Photo services — ShareServer in background QThread on port 8000
+    share_server = ShareServer(photos_root=DEFAULT_PHOTOS_DIR)
+    share_server.start()
+    share_service = ShareService(share_server=share_server)
+    photo_service = PhotoService(
+        worker=worker,
+        share=share_service,
+        photos_base=DEFAULT_PHOTOS_DIR,
+    )
+    _ = photo_service  # keep ref alive (signal connection only)
+
     # Experience plugin registry + manager
     registry = discover_experiences()
     logger.info(f"Discovered {len(registry)} experience plugin(s): {list(registry.keys())}")
@@ -105,6 +120,8 @@ def run(argv: list[str]) -> int:
     logger.info("Shutting down: stopping VisionWorker")
     exp_manager.unload()
     worker.stop()
+    logger.info("Shutting down: stopping ShareServer")
+    share_server.stop()
     return exit_code
 
 
