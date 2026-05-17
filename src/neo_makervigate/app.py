@@ -26,6 +26,7 @@ from neo_makervigate import __version__
 from neo_makervigate.config.settings import load_settings
 from neo_makervigate.core.gesture_detector import GestureDetector
 from neo_makervigate.core.photo_capture import DEFAULT_PHOTOS_DIR
+from neo_makervigate.core.qwen_client import QwenLocalBackend
 from neo_makervigate.core.share_server import ShareServer
 from neo_makervigate.core.vision_engine import VisionEngine, VisionSource
 from neo_makervigate.core.vision_simulator import VisionSimulator
@@ -34,6 +35,7 @@ from neo_makervigate.experiences.registry import discover_experiences
 from neo_makervigate.services.app_controller import AppController
 from neo_makervigate.services.experience_manager import ExperienceManager
 from neo_makervigate.services.photo_service import PhotoService
+from neo_makervigate.services.qwen_service import QwenService
 from neo_makervigate.services.share_service import ShareService
 from neo_makervigate.ui.image_provider import CameraImageProvider
 from neo_makervigate.utils.logging_config import setup_logging
@@ -88,6 +90,17 @@ def run(argv: list[str]) -> int:
     )
     _ = photo_service  # keep ref alive (signal connection only)
 
+    # P6: Qwen LLM (local) — for exp06 Photo Booth caption
+    qwen_backend = QwenLocalBackend()
+    if qwen_backend.is_ready():
+        qwen_service: QwenService | None = QwenService(client=qwen_backend)
+    else:
+        logger.warning(
+            "Qwen model not found. exp06 will use template captions. "
+            "Install: python -m neo_makervigate.scripts.download_qwen"
+        )
+        qwen_service = None
+
     # Experience plugin registry + manager
     registry = discover_experiences()
     logger.info(f"Discovered {len(registry)} experience plugin(s): {list(registry.keys())}")
@@ -122,6 +135,9 @@ def run(argv: list[str]) -> int:
     worker.stop()
     logger.info("Shutting down: stopping ShareServer")
     share_server.stop()
+    if qwen_service is not None:
+        logger.info("Shutting down: stopping QwenService")
+        qwen_service.stop()
     return exit_code
 
 
