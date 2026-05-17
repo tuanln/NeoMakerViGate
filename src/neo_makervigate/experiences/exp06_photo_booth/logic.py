@@ -213,12 +213,39 @@ class PhotoBoothExperience(BaseExperience):
             if since_change >= SELECT_AUTO_ADVANCE_SEC:
                 self._phase = Phase.STAGE
                 self._phase_started_at = now
+        elif self._phase == Phase.COUNTDOWN:
+            self._countdown_remaining = max(0.0, COUNTDOWN_DURATION - elapsed)
+            if elapsed >= COUNTDOWN_DURATION:
+                self._enter_processing(now)
+        elif self._phase == Phase.PROCESSING:
+            if (now - self._processing_started_at) >= PROCESSING_TIMEOUT:
+                self._fallback_caption()
 
     def _enter_countdown(self, now: float) -> None:
         self._phase = Phase.COUNTDOWN
         self._phase_started_at = now
         self._countdown_remaining = COUNTDOWN_DURATION
         self._v_sign_holding_since = None
+
+    def _enter_processing(self, now: float) -> None:
+        self._phase = Phase.PROCESSING
+        self._phase_started_at = now
+        self._processing_started_at = now
+        self._processing_status = "waiting_photo"
+        bg = self._backgrounds[self._selected_bg_index]
+        SignalBus.instance().photo_capture_requested.emit({
+            "experience_id": self.meta.id,
+            "background_path": str(bg.path),
+        })
+
+    def _fallback_caption(self) -> None:
+        # Real implementation in T14; for now just transition to DONE
+        bg = self._backgrounds[self._selected_bg_index]
+        self._caption = bg.fallback_caption
+        self._caption_from_qwen = False
+        self._processing_status = "done"
+        self._phase = Phase.DONE
+        self._phase_started_at = self._clock()
 
     # Placeholders — flesh out in T12-T14
     def _on_photo_captured(self, result: PhotoResult) -> None:

@@ -130,3 +130,58 @@ def test_point_resets_select_auto_advance_timer(
     clock.advance(2.0)
     exp.on_vision_frame(_make_empty_frame())
     assert exp.render_state()["phase"] == Phase.SELECT.value
+
+
+def test_v_sign_in_stage_triggers_countdown_after_hold(
+    exp_with_clock: tuple[PhotoBoothExperience, _FakeClock],
+) -> None:
+    exp, clock = exp_with_clock
+    # Get to STAGE
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_empty_frame())  # → SELECT
+    clock.advance(3.1)
+    exp.on_vision_frame(_make_empty_frame())  # → STAGE
+    # First V_SIGN — starts holding
+    exp.on_gesture("V_SIGN")
+    assert exp.render_state()["phase"] == Phase.STAGE.value
+    # After hold duration
+    clock.advance(0.6)
+    exp.on_gesture("V_SIGN")
+    assert exp.render_state()["phase"] == Phase.COUNTDOWN.value
+
+
+def test_countdown_advances_3_to_0_then_emits_capture(
+    exp_with_clock: tuple[PhotoBoothExperience, _FakeClock],
+) -> None:
+    from neo_makervigate.utils.signal_bus import SignalBus
+
+    exp, clock = exp_with_clock
+    # Get to COUNTDOWN
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_empty_frame())  # SELECT
+    clock.advance(3.1)
+    exp.on_vision_frame(_make_empty_frame())  # STAGE
+    exp.on_gesture("V_SIGN")
+    clock.advance(0.6)
+    exp.on_gesture("V_SIGN")  # → COUNTDOWN
+
+    requests: list[dict[str, object]] = []
+    SignalBus.instance().photo_capture_requested.connect(lambda p: requests.append(p))
+
+    # Tick during countdown
+    clock.advance(1.0)
+    exp.on_vision_frame(_make_empty_frame())
+    state = exp.render_state()
+    assert state["phase"] == Phase.COUNTDOWN.value
+    rem = cast(float, state["countdown_remaining"])
+    assert 1.5 < rem < 2.5  # ~2s remaining
+
+    # End of countdown
+    clock.advance(2.5)
+    exp.on_vision_frame(_make_empty_frame())
+    state = exp.render_state()
+    assert state["phase"] == Phase.PROCESSING.value
+    assert len(requests) == 1
+    params = requests[0]
+    assert params["experience_id"] == "exp06_photo_booth"
+    assert "background_path" in params
