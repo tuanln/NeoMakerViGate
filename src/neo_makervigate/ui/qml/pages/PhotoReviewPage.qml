@@ -12,6 +12,7 @@ Item {
     readonly property string qrPath: result && result.qr_path ? result.qr_path : ""
     readonly property string downloadUrl: result && result.download_url ? result.download_url : ""
     readonly property string originalPath: result && result.original_path ? result.original_path : ""
+    readonly property string caption: result && result.caption ? result.caption : ""
 
     Rectangle {
         anchors.fill: parent
@@ -73,6 +74,18 @@ Item {
                     fillMode: Image.PreserveAspectFit
                     cache: false
                 }
+            }
+
+            Text {
+                visible: page.caption.length > 0
+                text: page.caption
+                font.pixelSize: 22
+                font.bold: true
+                color: Sing.NeoConstants.de
+                font.italic: true
+                wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignHCenter
+                Layout.fillWidth: true
             }
 
             Text {
