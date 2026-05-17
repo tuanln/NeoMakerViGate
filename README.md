@@ -1,10 +1,15 @@
 # NeoMakerViGate — Cổng Vào Làng Maker
 
 > Trạm 1 (Cổng Vào) — Cổng Làng Maker @ FPT Shop
-> 7 trải nghiệm vision-tracking cho trẻ 4–14 tuổi, chạy trên NEO One (ARM64).
+> Vision-tracking platform cho trẻ 4–14 tuổi, chạy trên NEO One (ARM64).
 > Maker Việt × Dế Foundation × ThingEdu — License MIT.
 
-**Trạng thái:** v0.1.0 — Phase 0 skeleton, đang phát triển trên macOS, sẽ deploy NEO One Allwinner ARM64.
+**Trạng thái (2026-05-17):** MVP 3 game hoàn tất (P0-P6), pending NEO One deploy (P7) + manual smoke test webcam.
+
+- 141 tests pass (ruff/mypy strict clean)
+- exp01 Wave Cricket + exp03 Yoga Robot + exp06 Photo Booth done
+- ShareServer + QR share via LAN done
+- Qwen 2.5-VL caption (optional — fallback templates nếu model missing)
 
 ---
 
@@ -12,67 +17,92 @@
 
 - [Triết lý & sản phẩm](DOC/ARCHITECTURE.md#1-tổng-quan-sản-phẩm)
 - [Kiến trúc 5 lớp](DOC/ARCHITECTURE.md#3-kiến-trúc-tổng-thể)
-- [Scope MVP 3 trải nghiệm (đang làm)](DOC/ARCHITECTURE_MVP.md)
-- [Phase plan 8 tuần solo dev](DOC/PHASES.md)
+- [Scope MVP 3 trải nghiệm](DOC/ARCHITECTURE_MVP.md)
+- [Phase plan](DOC/PHASES.md)
+- [Plugin guide — viết experience mới](DOC/PLUGIN_GUIDE.md)
+- [Qwen setup — caption AI cho exp06](DOC/QWEN_SETUP.md)
+- [Deploy NEO One](DOC/DEPLOY_NEO_ONE.md) (P7)
+- [Spec + plan archives](docs/superpowers/)
+
+---
+
+## MVP scope — 3 trải nghiệm + share
+
+| # | Plugin | Vision | Game flow | Phase |
+|---|---|---|---|---|
+| 1 | `exp01_wave_cricket` — Vẫy Chào Dế | Hands (WAVE) | INTRO→PLAYING 60s→RESULT 3s | P3 ✅ |
+| 2 | `exp03_yoga_robot` — Yoga Robot | Pose 33 landmarks | INTRO→POSING 5×45s→RESULT | P4 ✅ |
+| 3 | `exp06_photo_booth` — Photo Booth Cổng Làng | Hands + Selfie Seg | SELECT bg→V_SIGN→COUNTDOWN→PROCESSING+Qwen→DONE | P6 ✅ |
+
+**Cross-experience features:**
+- PhotoCapture + ShareServer + QR (every experience can share photos) — P5 ✅
+- exp06 ghép nền 4 cảnh (Sân Đình / Lũy Tre / Sân FGC / Sao Hỏa) + Qwen caption tiếng Việt
+
+**Out-of-scope post-pilot:** exp02 Catch Bug, exp04 Smile Charge, exp05 Turtle Logo, exp07 Neo Tre Vision (Qwen dialog + voice).
 
 ---
 
 ## Quickstart trên macOS
 
 ```bash
-# 1. Clone
+# 1. Clone + venv
 git clone https://github.com/tuanln/NeoMakerViGate.git
 cd NeoMakerViGate
-
-# 2. Virtualenv
 python3.12 -m venv .venv
 source .venv/bin/activate
 
-# 3. Install deps (dev mode)
+# 2. Install deps (dev mode)
 pip install -e ".[dev]"
 
-# 4. Chạy với Vision Simulator (không cần webcam)
-NEO_MAKERVIGATE_VISION=simulator python -m neo_makervigate
+# 3. (Optional) Qwen local model cho exp06 caption
+# Cần ~1.5GB disk space — xem DOC/QWEN_SETUP.md
+pip install llama-cpp-python
+python -m neo_makervigate.scripts.download_qwen
 
-# Hoặc dùng webcam thật trên Mac
+# 4. Chạy
+# Webcam thật (cần macOS Camera permission cho Terminal):
 python -m neo_makervigate
+
+# Hoặc Vision Simulator (test UI flow, không cần webcam):
+NEO_MAKERVIGATE_VISION=simulator python -m neo_makervigate
 ```
 
-## Chạy test
+### Test với phụ huynh
+
+1. Trên Mac M4: app boot → ShareServer `http://<lan-ip>:8000`
+2. Chơi exp06 → V-sign → ảnh được ghép nền + caption AI
+3. iPhone cùng WiFi: scan QR bằng Zalo → tải ảnh về
+
+## Run test
 
 ```bash
-make test        # pytest unit + integration
-make lint        # ruff + mypy
-make all         # format + lint + test
+.venv/bin/python -m pytest          # 141 tests (~17s)
+ruff check                          # lint
+mypy src/                           # types strict
 ```
 
-## Deploy NEO One (ARM64 Ubuntu 22.04)
-
-Xem [`DOC/DEPLOY_NEO_ONE.md`](DOC/DEPLOY_NEO_ONE.md) (Phase 7 deliverable).
-
-```bash
-# Trên NEO One — script tự cài deps + tải model + setup systemd kiosk
-bash deployment/install-armbian.sh
-```
+Test files được colocated với plugin (`src/.../test_logic.py`) + dùng chung với `tests/unit/`.
 
 ---
 
-## MVP scope (8 tuần solo dev)
+## Deploy NEO One (ARM64)
 
-3 trải nghiệm + Hub + chia sẻ ảnh qua QR:
+Pending P7 (hardware về 2-4 tuần). Khi sẵn sàng:
 
-| # | Plugin | Vision | Phase |
-|---|---|---|---|
-| 1 | `exp01_wave_cricket` — Vẫy Chào Dế | MediaPipe Hands | P3 |
-| 2 | `exp03_yoga_robot` — Yoga Robot | MediaPipe Pose | P4 |
-| 3 | `exp06_photo_booth` — Photo Booth Cổng Làng | Selfie Seg + Pose + Qwen | P6 |
+```bash
+# Trên NEO One — script tự cài deps + tải models + systemd kiosk
+bash deployment/install-armbian.sh
+sudo systemctl enable makervigate
+sudo reboot
+```
 
-4 trải nghiệm còn lại (exp02, exp04, exp05, exp07) lùi sau pilot.
+Chi tiết: [`DOC/DEPLOY_NEO_ONE.md`](DOC/DEPLOY_NEO_ONE.md).
 
 ---
 
 ## Liên hệ & License
 
-- **Tổ chức:** Maker Việt × Dế Foundation — ThingEdu
+- **Tổ chức:** Maker Việt × Dế Foundation × ThingEdu
 - **License:** [MIT](LICENSE)
 - **Kế thừa kiến trúc:** NeoStopMotion (SignalBus, Worker Thread, ShareServer), NEOSTEM (QML Singletons)
+- **Dev workflow:** spec → plan → subagent-driven TDD execution (docs/superpowers/)
