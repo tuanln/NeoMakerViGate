@@ -44,4 +44,18 @@ ApplicationWindow {
             }
         }
     }
+
+    Component {
+        id: photoReviewComponent
+        PhotoReviewPage {
+            onBackRequested: stack.pop()
+        }
+    }
+
+    Connections {
+        target: app
+        function onPhotoReviewRequested() {
+            stack.push(photoReviewComponent)
+        }
+    }
 }
