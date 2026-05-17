@@ -176,6 +176,56 @@ def test_watchdog_unloads_slow_plugin(qapp) -> None:
     assert mgr.current_id is None  # watchdog đã unload
 
 
+def test_phase_done_emits_photo_capture_requested_before_unload(qapp) -> None:
+    """Khi plugin trả phase=done, manager emit photo_capture_requested rồi unload."""
+    from datetime import datetime
+
+    from neo_makervigate.core.models import ExperienceMeta, VisionFrame
+    from neo_makervigate.experiences.experience_base import BaseExperience
+
+    class _DoneExp(BaseExperience):
+        meta = ExperienceMeta(
+            id="done_p5",
+            title="Done P5",
+            subtitle="",
+            age_min=4,
+            age_max=14,
+            vision_modules=("hands",),
+        )
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.frames = 0
+
+        def get_qml_path(self) -> str:
+            return ""
+
+        def on_vision_frame(self, frame: VisionFrame) -> None:
+            self.frames += 1
+
+        def render_state(self) -> dict[str, object]:
+            if self.frames >= 2:
+                return {"phase": "done"}
+            return {"phase": "playing"}
+
+        def completion_summary(self) -> dict[str, object]:
+            return {"completed": True, "score": 100}
+
+    mgr = ExperienceManager(registry={"done_p5": _DoneExp})
+    mgr.load("done_p5")
+    captured_requests: list[dict] = []
+    SignalBus.instance().photo_capture_requested.connect(lambda p: captured_requests.append(p))
+
+    bus = SignalBus.instance()
+    bus.vision_frame_ready.emit(VisionFrame(timestamp=datetime.now(), width=640, height=360))
+    bus.vision_frame_ready.emit(VisionFrame(timestamp=datetime.now(), width=640, height=360))
+
+    assert len(captured_requests) == 1
+    assert captured_requests[0]["experience_id"] == "done_p5"
+    assert "summary" in captured_requests[0]
+    assert mgr.current_id is None
+
+
 def test_phase_done_triggers_auto_unload(qapp) -> None:
     """Plugin có render_state()['phase']=='done' phải auto-unload qua _on_vision_frame."""
 

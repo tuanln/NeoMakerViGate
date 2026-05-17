@@ -153,6 +153,13 @@ class ExperienceManager:
                 if isinstance(state, dict) and state.get("phase") == "done":
                     summary_fn = getattr(self._current_instance, "completion_summary", None)
                     summary = summary_fn() if callable(summary_fn) else {"completed": True}
+                    exp_id = self._current_id or ""
+                    # P5: request photo capture BEFORE unload — PhotoService will use
+                    # VisionWorker.latest_frame_bgr (still valid at this point).
+                    SignalBus.instance().photo_capture_requested.emit({
+                        "experience_id": exp_id,
+                        "summary": summary,
+                    })
                     self.unload(summary)
                     return
             except Exception as e:
