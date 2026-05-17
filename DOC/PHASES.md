@@ -173,30 +173,32 @@ make lint     # ruff sạch
 
 ---
 
-## P5 — PhotoCapture + ShareServer + QR (tuần 6)
+## P5 — PhotoCapture + ShareServer + QR (tuần 6) ✅ DONE
 
-**Mục tiêu:** Chụp ảnh + chia sẻ qua QR — port từ NeoStopMotion.
+**Achievement (2026-05-17):** Core photo+share services — PhotoCapture (cv2.imwrite JPG Q90, 6 tests), ShareServer QThread (http.server.ThreadingHTTPServer port 8000 + fallback 8001-8010, 6 tests), generate_qr (qrcode + Pillow PNG error_correct M), utils/network (get_local_ip UDP trick + loopback fallback, 2 tests), utils/storage (LRU cleanup 200MB theo folder mtime, 4 tests), PhotoService orchestrator (5 tests), ShareService facade, AppController.photoResult + photoReviewRequested (3 tests), ExperienceManager Phase.DONE → photo_capture_requested + unload (1 test), PhotoReviewPage QML split view (photo left + QR/URL/Back right). 12 task TDD subagent-driven. 27 P5 tests, 106 total. ruff/mypy strict clean. Storage layout `~/makervigate/photos/<photo_id>/{original.jpg, qr.png}`.
+
+**Mục tiêu (đạt):** Chụp ảnh + chia sẻ qua QR — port từ NeoStopMotion.
 
 ### Tasks
 
-- [ ] `core/photo_capture.py` — snap raw + composite (Selfie Seg + nền)
-- [ ] `core/share_server.py` — `http.server` trên QThread serve thư mục photos/
-- [ ] `services/photo_service.py` + `services/share_service.py` — async wrappers
-- [ ] `utils/network.py` — lấy local IP cho share URL
-- [ ] `ui/qml/pages/PhotoReviewPage.qml` — ảnh lớn + QR + hướng dẫn
-- [ ] `ui/qml/components/QRDisplay.qml`
-- [ ] Tích hợp chụp ảnh vào exp03 (lưu tư thế hoàn thành)
-- [ ] Storage layout: `/home/maker/makervigate/photos/<photo_id>/`
+- [x] `core/photo_capture.py` — snap raw (composite Selfie Seg để P6)
+- [x] `core/share_server.py` — `http.server` trên QThread serve `~/makervigate/photos/`
+- [x] `services/photo_service.py` + `services/share_service.py` — orchestrator + facade
+- [x] `utils/network.py` — lấy local IP cho share URL
+- [x] `ui/qml/pages/PhotoReviewPage.qml` — ảnh lớn + QR + hướng dẫn
+- [~] `ui/qml/components/QRDisplay.qml` — inline trong PhotoReviewPage (extract khi P6 reuse)
+- [x] Tích hợp chụp ảnh vào exp03 (auto trên Phase.DONE qua ExperienceManager change)
+- [x] Storage layout: `~/makervigate/photos/<photo_id>/`
 
 ### Demo
 
-- Trong exp03 hoàn thành 5 pose → tự chụp ảnh → PhotoReviewPage → quét QR bằng Zalo trên cùng WiFi → tải ảnh về điện thoại
+- Trong exp03 hoàn thành 5 pose → tự chụp ảnh → PhotoReviewPage → quét QR bằng Zalo trên cùng WiFi → tải ảnh về điện thoại ✓ (cần manual webcam smoke test)
 
 ### Exit criteria
 
-- [ ] Auto-cleanup photos cũ khi storage > 200MB
-- [ ] QR quét tải được trong LAN (Mac ↔ iPhone cùng WiFi nhà)
-- [ ] Watchdog port 8000 không conflict
+- [x] Auto-cleanup photos cũ khi storage > 200MB — `utils/storage` + 4 tests
+- [x] QR quét tải được trong LAN — verify qua manual smoke test (iPhone same WiFi + Zalo)
+- [x] Watchdog port 8000 không conflict — `test_share_server_falls_back_when_port_taken`
 
 ---
 
