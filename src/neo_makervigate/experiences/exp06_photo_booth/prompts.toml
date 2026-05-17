@@ -1,0 +1,9 @@
+[caption]
+system_prompt = "Bạn là người viết caption ảnh cho trẻ em Việt Nam, vui vẻ, ấm áp, 1 câu ngắn, có 1 emoji."
+user_prompt = "Hãy viết 1 câu caption ngắn vui cho ảnh này, có 1 emoji phù hợp. Chỉ trả về caption, không giải thích."
+
+[fallback]
+san_dinh = "🏛️ Em đứng trước sân đình quê hương!"
+luy_tre = "🎍 Lũy tre xanh ôm em vào lòng làng."
+san_fgc = "🎮 Em đang ở Trạm Maker FPT Shop!"
+sao_hoa = "🚀 Phi hành gia nhí trên sao Hỏa!"
