@@ -44,6 +44,12 @@ class VisionWorker(QThread):
         with self._lock:
             return None if self._latest_frame_bgr is None else self._latest_frame_bgr.copy()
 
+    @property
+    def latest_vision_frame(self) -> VisionFrame | None:
+        """Last VisionFrame (with landmarks + selfie_mask)."""
+        with self._lock:
+            return self._latest_vision_frame
+
     def set_active_modules(self, modules: list[str]) -> None:
         """Thread-safe API để ExperienceManager đổi module."""
         self._source.set_active_modules(modules)

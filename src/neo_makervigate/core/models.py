@@ -6,6 +6,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
+from typing import Any
+
+import numpy as np
 
 
 class AppStatus(StrEnum):
@@ -50,6 +53,7 @@ class VisionFrame:
     face: list[Landmark] = field(default_factory=list)
     has_person: bool = False
     raw_jpeg_path: Path | None = None
+    selfie_mask: np.ndarray[Any, Any] | None = None
 
 
 @dataclass(frozen=True)

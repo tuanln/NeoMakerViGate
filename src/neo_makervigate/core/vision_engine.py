@@ -200,6 +200,13 @@ class VisionEngine:
                 detector = self._detectors.get(name)
                 if detector is None:
                     continue
+                if name == "selfie":
+                    seg_result = detector.segment_for_video(mp_image, ts_ms)  # type: ignore[attr-defined]
+                    if seg_result.confidence_masks:
+                        mask = seg_result.confidence_masks[0].numpy_view()
+                        vf.selfie_mask = mask
+                        vf.has_person = True
+                    continue
                 result = detector.detect_for_video(mp_image, ts_ms)  # type: ignore[attr-defined]
                 if name == "hands" and result.hand_landmarks:
                     vf.hands = [
@@ -258,6 +265,14 @@ class VisionEngine:
                     min_face_detection_confidence=0.5,
                     min_face_presence_confidence=0.5,
                     min_tracking_confidence=0.5,
+                )
+            )
+        if name == "selfie":
+            return mp_vision.ImageSegmenter.create_from_options(
+                mp_vision.ImageSegmenterOptions(
+                    base_options=base,
+                    running_mode=mp_vision.RunningMode.VIDEO,
+                    output_confidence_masks=True,
                 )
             )
         raise ValueError(f"Module not yet implemented: {name}")
