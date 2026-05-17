@@ -269,3 +269,50 @@ def test_phase_done_triggers_auto_unload(qapp) -> None:
     # Frame 2 — instance trả "done" → manager auto-unload
     bus.vision_frame_ready.emit(VisionFrame(timestamp=datetime.now(), width=640, height=360))
     assert mgr.current_id is None
+
+
+def test_auto_capture_on_done_false_skips_photo_request(qapp) -> None:
+    """Plugin với auto_capture_on_done=False → manager KHÔNG emit photo_capture_requested."""
+    from datetime import datetime
+
+    from neo_makervigate.core.models import ExperienceMeta, VisionFrame
+    from neo_makervigate.experiences.experience_base import BaseExperience
+
+    class _SelfOrchExp(BaseExperience):
+        auto_capture_on_done = False
+        meta = ExperienceMeta(
+            id="self_orch",
+            title="SelfOrch",
+            subtitle="",
+            age_min=4,
+            age_max=14,
+            vision_modules=("hands",),
+        )
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.frames = 0
+
+        def get_qml_path(self) -> str:
+            return ""
+
+        def on_vision_frame(self, frame: VisionFrame) -> None:
+            self.frames += 1
+
+        def render_state(self) -> dict[str, object]:
+            return {"phase": "done"} if self.frames >= 2 else {"phase": "playing"}
+
+        def completion_summary(self) -> dict[str, object]:
+            return {"completed": True}
+
+    mgr = ExperienceManager(registry={"self_orch": _SelfOrchExp})
+    mgr.load("self_orch")
+    requests: list[dict] = []
+    SignalBus.instance().photo_capture_requested.connect(lambda p: requests.append(p))
+
+    bus = SignalBus.instance()
+    bus.vision_frame_ready.emit(VisionFrame(timestamp=datetime.now(), width=640, height=360))
+    bus.vision_frame_ready.emit(VisionFrame(timestamp=datetime.now(), width=640, height=360))
+
+    assert mgr.current_id is None
+    assert requests == []

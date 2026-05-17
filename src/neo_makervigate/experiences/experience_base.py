@@ -39,6 +39,8 @@ class BaseExperience(ABC):
 
     # Plugin override
     meta: ClassVar[ExperienceMeta]
+    # Plugin can override to False (e.g., exp06 self-orchestrates capture+caption)
+    auto_capture_on_done: ClassVar[bool] = True
 
     def __init__(self) -> None:
         if not hasattr(self.__class__, "meta"):
