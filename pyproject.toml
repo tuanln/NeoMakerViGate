@@ -113,7 +113,7 @@ warn_unused_ignores = true
 plugins = []
 
 [[tool.mypy.overrides]]
-module = ["mediapipe.*", "cv2.*", "qrcode.*", "PyQt6.*", "scipy.*"]
+module = ["mediapipe.*", "cv2.*", "qrcode.*", "PyQt6.*", "scipy.*", "llama_cpp", "llama_cpp.*"]
 ignore_missing_imports = true
 
 # pyqtProperty decorator chưa có type stub đầy đủ — disable strict cho service layer
