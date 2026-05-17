@@ -238,24 +238,62 @@ class PhotoBoothExperience(BaseExperience):
             "background_path": str(bg.path),
         })
 
+    def _on_photo_captured(self, result: PhotoResult) -> None:
+        if self._phase != Phase.PROCESSING:
+            return
+        if result.experience_id != self.meta.id:
+            return
+        if not result.success:
+            self._fallback_caption()
+            return
+        self._photo_id = result.photo_id
+        self._photo_dir = result.original_path.parent if result.original_path else None
+        self._composite_path = result.composite_path
+        self._processing_status = "waiting_qwen"
+        target = result.composite_path or result.original_path
+        if target is None:
+            self._fallback_caption()
+            return
+        SignalBus.instance().qwen_request_started.emit({
+            "image_path": str(target),
+            "prompt": self._prompts["caption"]["user_prompt"],
+            "max_tokens": 80,
+        })
+
+    def _on_qwen_response(self, text: str) -> None:
+        if self._phase != Phase.PROCESSING:
+            return
+        cleaned = text.strip()
+        if len(cleaned) < 5:
+            self._fallback_caption()
+            return
+        self._caption = cleaned
+        self._caption_from_qwen = True
+        self._save_caption_and_finish()
+
+    def _on_qwen_failed(self, error: str) -> None:
+        if self._phase != Phase.PROCESSING:
+            return
+        logger.warning(f"Qwen failed in exp06: {error}")
+        self._fallback_caption()
+
     def _fallback_caption(self) -> None:
-        # Real implementation in T14; for now just transition to DONE
         bg = self._backgrounds[self._selected_bg_index]
         self._caption = bg.fallback_caption
         self._caption_from_qwen = False
+        self._save_caption_and_finish()
+
+    def _save_caption_and_finish(self) -> None:
+        if self._photo_dir:
+            try:
+                (self._photo_dir / "caption.txt").write_text(self._caption, encoding="utf-8")
+            except OSError as e:
+                logger.warning(f"caption.txt write failed: {e}")
+        if self._photo_id:
+            SignalBus.instance().photo_caption_ready.emit(self._photo_id, self._caption)
         self._processing_status = "done"
         self._phase = Phase.DONE
         self._phase_started_at = self._clock()
-
-    # Placeholders — flesh out in T12-T14
-    def _on_photo_captured(self, result: PhotoResult) -> None:
-        pass
-
-    def _on_qwen_response(self, text: str) -> None:
-        pass
-
-    def _on_qwen_failed(self, error: str) -> None:
-        pass
 
 
 EXPERIENCE = PhotoBoothExperience

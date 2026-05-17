@@ -185,3 +185,147 @@ def test_countdown_advances_3_to_0_then_emits_capture(
     params = requests[0]
     assert params["experience_id"] == "exp06_photo_booth"
     assert "background_path" in params
+
+
+def test_photo_captured_triggers_qwen_request(
+    exp_with_clock: tuple[PhotoBoothExperience, _FakeClock],
+) -> None:
+    from pathlib import Path
+
+    from neo_makervigate.core.models import PhotoResult
+    from neo_makervigate.utils.signal_bus import SignalBus
+
+    exp, clock = exp_with_clock
+    # Skip to PROCESSING
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_empty_frame())  # SELECT
+    clock.advance(3.1)
+    exp.on_vision_frame(_make_empty_frame())  # STAGE
+    exp.on_gesture("V_SIGN")
+    clock.advance(0.6)
+    exp.on_gesture("V_SIGN")  # COUNTDOWN
+    clock.advance(3.1)
+    exp.on_vision_frame(_make_empty_frame())  # PROCESSING
+
+    qwen_requests: list[dict[str, object]] = []
+    SignalBus.instance().qwen_request_started.connect(lambda p: qwen_requests.append(p))
+
+    result = PhotoResult(
+        success=True,
+        photo_id="photo_test",
+        original_path=Path("/tmp/orig.jpg"),
+        composite_path=Path("/tmp/comp.jpg"),
+        qr_path=Path("/tmp/qr.png"),
+        download_url="http://x/composite.jpg",
+        experience_id="exp06_photo_booth",
+    )
+    SignalBus.instance().photo_captured.emit(result)
+    qapp_proc = pytest.importorskip("PyQt6.QtCore").QCoreApplication.instance()
+    if qapp_proc:
+        qapp_proc.processEvents()
+
+    assert len(qwen_requests) == 1
+    assert "image_path" in qwen_requests[0]
+
+
+def test_qwen_response_sets_caption_and_advances_to_done(
+    exp_with_clock: tuple[PhotoBoothExperience, _FakeClock],
+) -> None:
+    import tempfile
+    from pathlib import Path
+
+    from neo_makervigate.core.models import PhotoResult
+    from neo_makervigate.utils.signal_bus import SignalBus
+
+    exp, clock = exp_with_clock
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_empty_frame())
+    clock.advance(3.1)
+    exp.on_vision_frame(_make_empty_frame())
+    exp.on_gesture("V_SIGN")
+    clock.advance(0.6)
+    exp.on_gesture("V_SIGN")
+    clock.advance(3.1)
+    exp.on_vision_frame(_make_empty_frame())  # PROCESSING
+
+    with tempfile.TemporaryDirectory() as td:
+        tdp = Path(td)
+        result = PhotoResult(
+            success=True,
+            photo_id="photo_test",
+            original_path=tdp / "orig.jpg",
+            composite_path=tdp / "comp.jpg",
+            qr_path=tdp / "qr.png",
+            download_url="http://x",
+            experience_id="exp06_photo_booth",
+        )
+        (tdp / "orig.jpg").write_bytes(b"\xff\xd8\xff")
+        SignalBus.instance().photo_captured.emit(result)
+        SignalBus.instance().qwen_response_ready.emit("Em vẫy chào! 👋")
+        state = exp.render_state()
+        assert state["caption"] == "Em vẫy chào! 👋"
+        assert state["phase"] == Phase.DONE.value
+        assert (tdp / "caption.txt").exists()
+
+
+def test_qwen_failure_uses_fallback_caption(
+    exp_with_clock: tuple[PhotoBoothExperience, _FakeClock],
+) -> None:
+    import tempfile
+    from pathlib import Path
+
+    from neo_makervigate.core.models import PhotoResult
+    from neo_makervigate.utils.signal_bus import SignalBus
+
+    exp, clock = exp_with_clock
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_empty_frame())
+    clock.advance(3.1)
+    exp.on_vision_frame(_make_empty_frame())
+    exp.on_gesture("V_SIGN")
+    clock.advance(0.6)
+    exp.on_gesture("V_SIGN")
+    clock.advance(3.1)
+    exp.on_vision_frame(_make_empty_frame())
+
+    with tempfile.TemporaryDirectory() as td:
+        tdp = Path(td)
+        result = PhotoResult(
+            success=True,
+            photo_id="photo_test",
+            original_path=tdp / "orig.jpg",
+            composite_path=None,
+            qr_path=tdp / "qr.png",
+            download_url="http://x",
+            experience_id="exp06_photo_booth",
+        )
+        (tdp / "orig.jpg").write_bytes(b"\xff\xd8\xff")
+        SignalBus.instance().photo_captured.emit(result)
+        SignalBus.instance().qwen_failed.emit("model crash")
+        state = exp.render_state()
+        caption = cast(str, state["caption"])
+        # Should be fallback caption for default selected (san_dinh)
+        assert "Sân Đình" in caption or "🏛️" in caption
+        assert state["phase"] == Phase.DONE.value
+
+
+def test_processing_timeout_uses_fallback(
+    exp_with_clock: tuple[PhotoBoothExperience, _FakeClock],
+) -> None:
+    """If PROCESSING > 12s without qwen response, fallback caption."""
+    exp, clock = exp_with_clock
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_empty_frame())
+    clock.advance(3.1)
+    exp.on_vision_frame(_make_empty_frame())
+    exp.on_gesture("V_SIGN")
+    clock.advance(0.6)
+    exp.on_gesture("V_SIGN")
+    clock.advance(3.1)
+    exp.on_vision_frame(_make_empty_frame())
+    assert exp.render_state()["phase"] == Phase.PROCESSING.value
+    clock.advance(13.0)
+    exp.on_vision_frame(_make_empty_frame())
+    state = exp.render_state()
+    assert state["phase"] == Phase.DONE.value
+    assert state["caption"]
