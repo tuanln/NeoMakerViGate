@@ -68,3 +68,53 @@ def test_experience_state_cleared_on_end(qapp) -> None:
     mgr.unload()
     # _on_experience_ended slot clears state
     assert ctrl.experienceState == {}
+
+
+def test_app_controller_emits_photo_review_requested_on_capture(qapp) -> None:
+    """Khi SignalBus.photo_captured emit success → photoReviewRequested signal."""
+    from pathlib import Path
+
+    from neo_makervigate.core.models import PhotoResult
+    from neo_makervigate.utils.signal_bus import SignalBus
+
+    ctrl = AppController(experience_manager=None)
+    emits: list[bool] = []
+    ctrl.photoReviewRequested.connect(lambda: emits.append(True))
+
+    result = PhotoResult(
+        success=True,
+        photo_id="photo_test",
+        original_path=Path("/tmp/x.jpg"),
+        qr_path=Path("/tmp/qr.png"),
+        download_url="http://test/photo_test/original.jpg",
+        experience_id="exp_test",
+    )
+    SignalBus.instance().photo_captured.emit(result)
+    qapp.processEvents()
+    assert emits == [True]
+    state = ctrl.photoResult
+    assert state["photo_id"] == "photo_test"
+    assert state["download_url"] == "http://test/photo_test/original.jpg"
+    assert state["qr_path"] == "/tmp/qr.png"
+
+
+def test_app_controller_does_not_emit_review_on_failed_capture(qapp) -> None:
+    """Khi photo_captured emit failure → KHÔNG push review."""
+    from neo_makervigate.core.models import PhotoResult
+    from neo_makervigate.utils.signal_bus import SignalBus
+
+    ctrl = AppController(experience_manager=None)
+    emits: list[bool] = []
+    ctrl.photoReviewRequested.connect(lambda: emits.append(True))
+
+    result = PhotoResult(
+        success=False, photo_id="", experience_id="exp", error_message="oops",
+    )
+    SignalBus.instance().photo_captured.emit(result)
+    qapp.processEvents()
+    assert emits == []
+
+
+def test_photo_result_empty_by_default(qapp) -> None:
+    ctrl = AppController(experience_manager=None)
+    assert ctrl.photoResult == {}

@@ -44,6 +44,8 @@ class AppController(QObject):
     currentExperienceChanged = pyqtSignal()
     statusChanged = pyqtSignal()
     experienceStateChanged = pyqtSignal()
+    photoResultChanged = pyqtSignal()
+    photoReviewRequested = pyqtSignal()
 
     def __init__(self, experience_manager: ExperienceManager | None = None) -> None:
         super().__init__()
@@ -67,6 +69,8 @@ class AppController(QObject):
         self._render_timer.setInterval(33)  # ~30Hz
         self._render_timer.timeout.connect(self._poll_render_state)
 
+        self._photo_result: dict[str, object] = {}
+
         bus = SignalBus.instance()
         bus.vision_frame_ready.connect(self._on_vision_frame)
         bus.vision_camera_ready.connect(self._on_camera_ready)
@@ -74,6 +78,7 @@ class AppController(QObject):
         bus.gesture_detected.connect(self._on_gesture)
         bus.experience_started.connect(self._on_experience_started)
         bus.experience_ended.connect(self._on_experience_ended)
+        bus.photo_captured.connect(self._on_photo_captured)
 
     # ---- Properties exposed to QML ----
 
@@ -116,6 +121,10 @@ class AppController(QObject):
     @pyqtProperty("QVariant", notify=experienceStateChanged)
     def experienceState(self) -> Any:
         return self._experience_state
+
+    @pyqtProperty("QVariant", notify=photoResultChanged)
+    def photoResult(self) -> Any:
+        return self._photo_result
 
     # ---- Public slots invokable từ QML ----
 
@@ -198,6 +207,23 @@ class AppController(QObject):
         if new_state != self._experience_state:
             self._experience_state = new_state
             self.experienceStateChanged.emit()
+
+    @pyqtSlot(object)
+    def _on_photo_captured(self, result: Any) -> None:
+        if not getattr(result, "success", False):
+            logger.warning(
+                f"Photo capture failed: {getattr(result, 'error_message', 'unknown')}"
+            )
+            return
+        self._photo_result = {
+            "photo_id": result.photo_id,
+            "original_path": str(result.original_path) if result.original_path else "",
+            "qr_path": str(result.qr_path) if result.qr_path else "",
+            "download_url": result.download_url or "",
+            "experience_id": result.experience_id,
+        }
+        self.photoResultChanged.emit()
+        self.photoReviewRequested.emit()
 
     @pyqtSlot(object)
     def _on_vision_frame(self, frame: VisionFrame) -> None:
