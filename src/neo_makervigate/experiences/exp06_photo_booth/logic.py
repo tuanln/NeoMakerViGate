@@ -161,6 +161,10 @@ class PhotoBoothExperience(BaseExperience):
 
     def on_gesture(self, gesture: str) -> None:
         now = self._clock()
+        if gesture == "POINT" and self._phase == Phase.SELECT:
+            self._selected_bg_index = (self._selected_bg_index + 1) % len(self._backgrounds)
+            self._select_last_change_at = now
+            return
         if gesture == "V_SIGN" and self._phase == Phase.STAGE:
             if self._v_sign_holding_since is None:
                 self._v_sign_holding_since = now
@@ -204,6 +208,11 @@ class PhotoBoothExperience(BaseExperience):
             self._phase = Phase.SELECT
             self._phase_started_at = now
             self._select_last_change_at = now
+        elif self._phase == Phase.SELECT:
+            since_change = now - self._select_last_change_at
+            if since_change >= SELECT_AUTO_ADVANCE_SEC:
+                self._phase = Phase.STAGE
+                self._phase_started_at = now
 
     def _enter_countdown(self, now: float) -> None:
         self._phase = Phase.COUNTDOWN
