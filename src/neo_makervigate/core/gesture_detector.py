@@ -28,7 +28,7 @@ WAVE_MIN_SAMPLES = 8
 BUFFER_MAXLEN = 60  # ~2s @ 30fps
 
 V_SIGN_COOLDOWN_SEC = 0.4
-V_SIGN_FINGER_MARGIN = 1.15
+V_SIGN_FINGER_MARGIN = 1.05
 
 
 def _finger_dist_from_wrist(hand: list[Any], idx: int) -> float:
