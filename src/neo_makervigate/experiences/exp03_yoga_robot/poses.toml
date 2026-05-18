@@ -1,91 +1,48 @@
 [[poses]]
-id = "T_POSE"
-title = "Chữ T"
-emoji = "✝️"
-subtitle = "Dang tay sang ngang như chữ T"
-[poses.angles]
-left_shoulder = 90
-right_shoulder = 90
-left_elbow = 180
-right_elbow = 180
-left_hip = 180
-right_hip = 180
-[poses.tolerance]
-shoulder = 20
-elbow = 15
-hip = 15
-knee = 30
+id = "CUOI_TO"
+title = "Cười to"
+emoji = "😄"
+subtitle = "Cười tươi, hé răng nhé!"
+detector = "smile"
+[poses.thresholds]
+mouth_width_ratio_min = 0.45
+mar_max = 0.25
 
 [[poses]]
-id = "TREE_POSE"
-title = "Cây Đứng"
-emoji = "🌳"
-subtitle = "Co 1 chân, tay giơ lên trời"
-[poses.angles]
-left_shoulder = 170
-right_shoulder = 170
-left_elbow = 160
-right_elbow = 160
-left_hip = 180
-right_hip = 90
-left_knee = 180
-right_knee = 45
-[poses.tolerance]
-shoulder = 25
-elbow = 25
-hip = 25
-knee = 30
+id = "MO_MIENG_O"
+title = "Mở miệng O"
+emoji = "😮"
+subtitle = "Há miệng tròn như chữ O"
+detector = "mouth_open"
+[poses.thresholds]
+mar_min = 0.55
 
 [[poses]]
-id = "STAR_POSE"
-title = "Ngôi Sao"
-emoji = "⭐"
-subtitle = "Dang tay + chân như chữ X"
-[poses.angles]
-left_shoulder = 135
-right_shoulder = 135
-left_elbow = 180
-right_elbow = 180
-left_hip = 135
-right_hip = 135
-[poses.tolerance]
-shoulder = 20
-elbow = 15
-hip = 20
-knee = 30
+id = "WINK"
+title = "Nháy mắt 1 bên"
+emoji = "😉"
+subtitle = "Nhắm 1 mắt, mở 1 mắt"
+detector = "wink"
+[poses.thresholds]
+closed_eye_ear_max = 0.15
+open_eye_ear_min = 0.25
 
 [[poses]]
-id = "Y_POSE"
-title = "Chữ Y"
-emoji = "🙌"
-subtitle = "Hai tay giơ lên thành chữ V"
-[poses.angles]
-left_shoulder = 160
-right_shoulder = 160
-left_elbow = 175
-right_elbow = 175
-left_hip = 180
-right_hip = 180
-[poses.tolerance]
-shoulder = 20
-elbow = 15
-hip = 15
-knee = 30
+id = "NHUONG_MAY"
+title = "Nhướng mày"
+emoji = "🤨"
+subtitle = "Nhướng mày lên cao"
+detector = "brow_raised"
+[poses.thresholds]
+brow_raised_min = 0.085
 
 [[poses]]
-id = "CACTUS_POSE"
-title = "Xương Rồng"
-emoji = "🌵"
-subtitle = "Tay co 90° hai bên đầu"
-[poses.angles]
-left_shoulder = 90
-right_shoulder = 90
-left_elbow = 90
-right_elbow = 90
-left_hip = 180
-right_hip = 180
-[poses.tolerance]
-shoulder = 20
-elbow = 20
-hip = 15
-knee = 30
+id = "LAC_DAU"
+title = "Lắc đầu"
+emoji = "🙅"
+subtitle = "Lắc đầu trái phải"
+detector = "head_shake"
+[poses.thresholds]
+yaw_amplitude_min = 0.25
+oscillation_window_sec = 1.5
+oscillation_min_crossings = 2

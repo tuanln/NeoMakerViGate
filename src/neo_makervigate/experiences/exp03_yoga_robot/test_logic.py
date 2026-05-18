@@ -1,9 +1,10 @@
-"""Tests cho YogaRobotExperience — gameplay logic độc lập, không Qt/QML."""
+"""Tests cho YogaRobotExperience (Face Yoga) — gameplay logic độc lập."""
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from datetime import datetime
-from typing import Any, cast
+from typing import Any, cast  # noqa: F401  -- re-used in T7+ detector tests
 
 import pytest
 
@@ -12,11 +13,10 @@ from neo_makervigate.experiences.exp03_yoga_robot.logic import (
     Phase,
     YogaRobotExperience,
 )
+from neo_makervigate.utils import face_math as fm
 
 
 class _FakeClock:
-    """Fake clock thay time.perf_counter để test phase transitions."""
-
     def __init__(self, t: float = 0.0) -> None:
         self.t = t
 
@@ -27,44 +27,135 @@ class _FakeClock:
         self.t += dt
 
 
-def _make_pose_frame(angles: dict[str, float] | None = None) -> VisionFrame:
-    """Sinh VisionFrame với 33 pose landmarks (T-pose synth mặc định)."""
-    L = [Landmark(x=0.5, y=0.5) for _ in range(33)]
-    L[11] = Landmark(x=0.4, y=0.4)
-    L[12] = Landmark(x=0.6, y=0.4)
-    L[13] = Landmark(x=0.25, y=0.4)
-    L[14] = Landmark(x=0.75, y=0.4)
-    L[15] = Landmark(x=0.1, y=0.4)
-    L[16] = Landmark(x=0.9, y=0.4)
-    L[23] = Landmark(x=0.42, y=0.6)
-    L[24] = Landmark(x=0.58, y=0.6)
-    L[25] = Landmark(x=0.42, y=0.78)
-    L[26] = Landmark(x=0.58, y=0.78)
-    L[27] = Landmark(x=0.42, y=0.95)
-    L[28] = Landmark(x=0.58, y=0.95)
+def _make_face_frame(scenario: str = "neutral", t: float = 0.0) -> VisionFrame:
+    """Synthesize 468-landmark face for various scenarios."""
+    L = [Landmark(x=0.5, y=0.5) for _ in range(468)]
+
+    # Anchor landmarks
+    L[fm.LEFT_TEMPLE] = Landmark(x=0.30, y=0.50)
+    L[fm.RIGHT_TEMPLE] = Landmark(x=0.70, y=0.50)
+    L[fm.NOSE_TIP] = Landmark(x=0.50, y=0.55)
+    L[fm.CHIN] = Landmark(x=0.50, y=0.85)
+
+    if scenario == "neutral":
+        L[fm.LIP_TOP] = Landmark(x=0.50, y=0.62)
+        L[fm.LIP_BOTTOM] = Landmark(x=0.50, y=0.63)
+        L[fm.LIP_LEFT] = Landmark(x=0.46, y=0.625)
+        L[fm.LIP_RIGHT] = Landmark(x=0.54, y=0.625)
+        L[fm.LEFT_EYE_TOP] = Landmark(x=0.40, y=0.48)
+        L[fm.LEFT_EYE_BOTTOM] = Landmark(x=0.40, y=0.51)
+        L[fm.LEFT_EYE_INNER] = Landmark(x=0.43, y=0.495)
+        L[fm.LEFT_EYE_OUTER] = Landmark(x=0.35, y=0.495)
+        L[fm.RIGHT_EYE_TOP] = Landmark(x=0.60, y=0.48)
+        L[fm.RIGHT_EYE_BOTTOM] = Landmark(x=0.60, y=0.51)
+        L[fm.RIGHT_EYE_INNER] = Landmark(x=0.57, y=0.495)
+        L[fm.RIGHT_EYE_OUTER] = Landmark(x=0.65, y=0.495)
+        L[fm.LEFT_BROW_INNER] = Landmark(x=0.45, y=0.46)
+        L[fm.RIGHT_BROW_INNER] = Landmark(x=0.55, y=0.46)
+
+    elif scenario == "smile":
+        L[fm.LIP_TOP] = Landmark(x=0.50, y=0.62)
+        L[fm.LIP_BOTTOM] = Landmark(x=0.50, y=0.625)
+        L[fm.LIP_LEFT] = Landmark(x=0.40, y=0.625)
+        L[fm.LIP_RIGHT] = Landmark(x=0.60, y=0.625)
+        L[fm.LEFT_EYE_TOP] = Landmark(x=0.40, y=0.48)
+        L[fm.LEFT_EYE_BOTTOM] = Landmark(x=0.40, y=0.51)
+        L[fm.LEFT_EYE_INNER] = Landmark(x=0.43, y=0.495)
+        L[fm.LEFT_EYE_OUTER] = Landmark(x=0.35, y=0.495)
+        L[fm.RIGHT_EYE_TOP] = Landmark(x=0.60, y=0.48)
+        L[fm.RIGHT_EYE_BOTTOM] = Landmark(x=0.60, y=0.51)
+        L[fm.RIGHT_EYE_INNER] = Landmark(x=0.57, y=0.495)
+        L[fm.RIGHT_EYE_OUTER] = Landmark(x=0.65, y=0.495)
+        L[fm.LEFT_BROW_INNER] = Landmark(x=0.45, y=0.46)
+        L[fm.RIGHT_BROW_INNER] = Landmark(x=0.55, y=0.46)
+
+    elif scenario == "mouth_open":
+        L[fm.LIP_TOP] = Landmark(x=0.50, y=0.55)
+        L[fm.LIP_BOTTOM] = Landmark(x=0.50, y=0.70)
+        L[fm.LIP_LEFT] = Landmark(x=0.46, y=0.625)
+        L[fm.LIP_RIGHT] = Landmark(x=0.54, y=0.625)
+        L[fm.LEFT_EYE_TOP] = Landmark(x=0.40, y=0.48)
+        L[fm.LEFT_EYE_BOTTOM] = Landmark(x=0.40, y=0.51)
+        L[fm.LEFT_EYE_INNER] = Landmark(x=0.43, y=0.495)
+        L[fm.LEFT_EYE_OUTER] = Landmark(x=0.35, y=0.495)
+        L[fm.RIGHT_EYE_TOP] = Landmark(x=0.60, y=0.48)
+        L[fm.RIGHT_EYE_BOTTOM] = Landmark(x=0.60, y=0.51)
+        L[fm.RIGHT_EYE_INNER] = Landmark(x=0.57, y=0.495)
+        L[fm.RIGHT_EYE_OUTER] = Landmark(x=0.65, y=0.495)
+        L[fm.LEFT_BROW_INNER] = Landmark(x=0.45, y=0.46)
+        L[fm.RIGHT_BROW_INNER] = Landmark(x=0.55, y=0.46)
+
+    elif scenario == "wink_left":
+        L[fm.LIP_TOP] = Landmark(x=0.50, y=0.62)
+        L[fm.LIP_BOTTOM] = Landmark(x=0.50, y=0.63)
+        L[fm.LIP_LEFT] = Landmark(x=0.46, y=0.625)
+        L[fm.LIP_RIGHT] = Landmark(x=0.54, y=0.625)
+        # Left eye closed
+        L[fm.LEFT_EYE_TOP] = Landmark(x=0.40, y=0.495)
+        L[fm.LEFT_EYE_BOTTOM] = Landmark(x=0.40, y=0.500)
+        L[fm.LEFT_EYE_INNER] = Landmark(x=0.43, y=0.497)
+        L[fm.LEFT_EYE_OUTER] = Landmark(x=0.35, y=0.497)
+        # Right eye open
+        L[fm.RIGHT_EYE_TOP] = Landmark(x=0.60, y=0.48)
+        L[fm.RIGHT_EYE_BOTTOM] = Landmark(x=0.60, y=0.51)
+        L[fm.RIGHT_EYE_INNER] = Landmark(x=0.57, y=0.495)
+        L[fm.RIGHT_EYE_OUTER] = Landmark(x=0.65, y=0.495)
+        L[fm.LEFT_BROW_INNER] = Landmark(x=0.45, y=0.46)
+        L[fm.RIGHT_BROW_INNER] = Landmark(x=0.55, y=0.46)
+
+    elif scenario == "brow_up":
+        L[fm.LIP_TOP] = Landmark(x=0.50, y=0.62)
+        L[fm.LIP_BOTTOM] = Landmark(x=0.50, y=0.63)
+        L[fm.LIP_LEFT] = Landmark(x=0.46, y=0.625)
+        L[fm.LIP_RIGHT] = Landmark(x=0.54, y=0.625)
+        L[fm.LEFT_EYE_TOP] = Landmark(x=0.40, y=0.48)
+        L[fm.LEFT_EYE_BOTTOM] = Landmark(x=0.40, y=0.51)
+        L[fm.LEFT_EYE_INNER] = Landmark(x=0.43, y=0.495)
+        L[fm.LEFT_EYE_OUTER] = Landmark(x=0.35, y=0.495)
+        L[fm.RIGHT_EYE_TOP] = Landmark(x=0.60, y=0.48)
+        L[fm.RIGHT_EYE_BOTTOM] = Landmark(x=0.60, y=0.51)
+        L[fm.RIGHT_EYE_INNER] = Landmark(x=0.57, y=0.495)
+        L[fm.RIGHT_EYE_OUTER] = Landmark(x=0.65, y=0.495)
+        L[fm.LEFT_BROW_INNER] = Landmark(x=0.45, y=0.43)
+        L[fm.RIGHT_BROW_INNER] = Landmark(x=0.55, y=0.43)
+
+    elif scenario == "head_left":
+        L[fm.NOSE_TIP] = Landmark(x=0.35, y=0.55)
+        L[fm.LIP_TOP] = Landmark(x=0.35, y=0.62)
+        L[fm.LIP_BOTTOM] = Landmark(x=0.35, y=0.63)
+        L[fm.LIP_LEFT] = Landmark(x=0.31, y=0.625)
+        L[fm.LIP_RIGHT] = Landmark(x=0.39, y=0.625)
+
+    elif scenario == "head_right":
+        L[fm.NOSE_TIP] = Landmark(x=0.65, y=0.55)
+        L[fm.LIP_TOP] = Landmark(x=0.65, y=0.62)
+        L[fm.LIP_BOTTOM] = Landmark(x=0.65, y=0.63)
+        L[fm.LIP_LEFT] = Landmark(x=0.61, y=0.625)
+        L[fm.LIP_RIGHT] = Landmark(x=0.69, y=0.625)
+
     vf = VisionFrame(timestamp=datetime(2026, 1, 1), width=1280, height=720)
-    vf.pose = L
+    vf.face = L
     return vf
 
 
 def _make_empty_frame() -> VisionFrame:
-    """Frame không có pose detection."""
     return VisionFrame(timestamp=datetime(2026, 1, 1), width=1280, height=720)
 
 
 @pytest.fixture
-def exp_with_clock() -> tuple[YogaRobotExperience, _FakeClock]:
+def exp_with_clock(qapp: object) -> Generator[tuple[YogaRobotExperience, _FakeClock], None, None]:  # qapp ensures QObject / Qt event loop is initialized
     clock = _FakeClock(0.0)
     exp = YogaRobotExperience(clock=clock)
     exp.on_enter()
-    return exp, clock
+    yield exp, clock
+    exp.on_exit()
 
 
-def test_meta_correct() -> None:
+def test_meta_face_module() -> None:
     meta = YogaRobotExperience.meta
     assert meta.id == "exp03_yoga_robot"
-    assert "pose" in meta.vision_modules
-    assert meta.age_min == 5
+    assert "face" in meta.vision_modules
+    assert "pose" not in meta.vision_modules
 
 
 def test_initial_phase_is_intro(
@@ -75,7 +166,7 @@ def test_initial_phase_is_intro(
     assert state["phase"] == Phase.INTRO.value
 
 
-def test_poses_toml_loaded_5_poses(
+def test_poses_toml_loaded_5_face_poses(
     exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
 ) -> None:
     exp, _ = exp_with_clock
@@ -92,262 +183,3 @@ def test_intro_transitions_to_posing_after_2s(
     clock.advance(2.1)
     exp.on_vision_frame(_make_empty_frame())
     assert exp.render_state()["phase"] == Phase.POSING.value
-
-
-def test_posing_starts_at_pose_index_0(
-    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
-) -> None:
-    exp, clock = exp_with_clock
-    clock.advance(2.1)
-    exp.on_vision_frame(_make_empty_frame())
-    state = exp.render_state()
-    assert state["pose_index"] == 0
-
-
-def test_match_increments_hold_progress(
-    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
-) -> None:
-    """T-pose synth → score >= MATCH_THRESHOLD → hold_progress tăng."""
-    exp, clock = exp_with_clock
-    clock.advance(2.1)
-    exp.on_vision_frame(_make_empty_frame())  # → POSING
-    # Frame 1 (delta=0): start hold
-    exp.on_vision_frame(_make_pose_frame())
-    state1 = exp.render_state()
-    # Advance 0.5s, frame 2
-    clock.advance(0.5)
-    exp.on_vision_frame(_make_pose_frame())
-    state2 = exp.render_state()
-    # hold_progress phải tăng
-    assert cast(float, state2["hold_progress"]) > cast(float, state1["hold_progress"])
-    # Score live phải >= threshold
-    assert cast(int, state2["score"]) >= 65
-
-
-def test_no_match_keeps_hold_at_zero(
-    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
-) -> None:
-    """Frame có pose nhưng angles sai → score < threshold → hold = 0."""
-    exp, clock = exp_with_clock
-    clock.advance(2.1)
-    exp.on_vision_frame(_make_empty_frame())  # → POSING (T_POSE target)
-
-    # Construct frame có pose nhưng "thõng tay xuống" (sai T-pose):
-    L = [Landmark(x=0.5, y=0.5) for _ in range(33)]
-    L[11] = Landmark(x=0.4, y=0.4)
-    L[12] = Landmark(x=0.6, y=0.4)
-    L[13] = Landmark(x=0.4, y=0.55)  # elbow xuống dưới (sai T)
-    L[14] = Landmark(x=0.6, y=0.55)
-    L[15] = Landmark(x=0.4, y=0.7)
-    L[16] = Landmark(x=0.6, y=0.7)
-    L[23] = Landmark(x=0.42, y=0.6)
-    L[24] = Landmark(x=0.58, y=0.6)
-    L[25] = Landmark(x=0.42, y=0.78)
-    L[26] = Landmark(x=0.58, y=0.78)
-    L[27] = Landmark(x=0.42, y=0.95)
-    L[28] = Landmark(x=0.58, y=0.95)
-    vf = VisionFrame(timestamp=datetime(2026, 1, 1), width=1280, height=720)
-    vf.pose = L
-
-    clock.advance(0.5)
-    exp.on_vision_frame(vf)
-    state = exp.render_state()
-    assert cast(int, state["score"]) < 65, f"expected score < 65, got {state['score']}"
-    assert cast(float, state["hold_progress"]) == 0.0
-
-
-def test_match_lost_resets_hold_after_gap_tolerance(
-    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
-) -> None:
-    """Match → lost > MATCH_GAP_TOLERANCE → hold reset."""
-    exp, clock = exp_with_clock
-    clock.advance(2.1)
-    exp.on_vision_frame(_make_empty_frame())  # → POSING
-
-    # Match
-    exp.on_vision_frame(_make_pose_frame())
-    clock.advance(0.5)
-    exp.on_vision_frame(_make_pose_frame())
-    state_matching = exp.render_state()
-    assert cast(float, state_matching["hold_progress"]) > 0
-
-    # Gap > 0.3s không match (empty frame)
-    clock.advance(0.5)
-    exp.on_vision_frame(_make_empty_frame())
-    clock.advance(0.1)
-    # Frame có pose lại nhưng pose sai → score < threshold
-    L_bad = [Landmark(x=0.5, y=0.5) for _ in range(33)]
-    L_bad[11] = Landmark(x=0.4, y=0.4)
-    L_bad[12] = Landmark(x=0.6, y=0.4)
-    L_bad[13] = Landmark(x=0.4, y=0.6)
-    L_bad[14] = Landmark(x=0.6, y=0.6)
-    L_bad[23] = Landmark(x=0.42, y=0.6)
-    L_bad[24] = Landmark(x=0.58, y=0.6)
-    vf_bad = VisionFrame(timestamp=datetime(2026, 1, 1), width=1280, height=720)
-    vf_bad.pose = L_bad
-    exp.on_vision_frame(vf_bad)
-    state_reset = exp.render_state()
-    assert cast(float, state_reset["hold_progress"]) == 0.0
-
-
-def test_match_held_3s_advances_to_next_pose(
-    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
-) -> None:
-    exp, clock = exp_with_clock
-    clock.advance(2.1)
-    exp.on_vision_frame(_make_empty_frame())  # → POSING pose 0
-
-    # Hold T-pose 4s (8 ticks × 0.5s) — đủ vượt HOLD_REQUIRED_SEC=3
-    for _ in range(8):
-        clock.advance(0.5)
-        exp.on_vision_frame(_make_pose_frame())
-    state = exp.render_state()
-    # Phải sang pose 1 (TREE_POSE)
-    assert state["pose_index"] == 1
-    completed = cast(list[dict[str, Any]], state["completed_poses"])
-    assert len(completed) == 1
-    assert completed[0]["id"] == "T_POSE"
-    assert cast(int, completed[0]["final_score"]) > 0
-    assert completed[0]["skipped"] is False
-
-
-def test_all_5_poses_completed_transitions_to_result(
-    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
-) -> None:
-    exp, clock = exp_with_clock
-    clock.advance(2.1)
-    exp.on_vision_frame(_make_empty_frame())  # → POSING pose 0
-
-    # Skip 5 poses qua 45s timer mỗi pose
-    for _ in range(5):
-        clock.advance(45.1)
-        exp.on_vision_frame(_make_empty_frame())
-    state = exp.render_state()
-    assert state["phase"] == Phase.RESULT.value
-
-
-def test_total_score_sums_pose_scores(
-    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
-) -> None:
-    exp, clock = exp_with_clock
-    clock.advance(2.1)
-    exp.on_vision_frame(_make_empty_frame())  # → POSING pose 0
-
-    # Complete pose 0 với T-pose hold 4s
-    for _ in range(8):
-        clock.advance(0.5)
-        exp.on_vision_frame(_make_pose_frame())
-    state = exp.render_state()
-    completed = cast(list[dict[str, Any]], state["completed_poses"])
-    expected_total = sum(cast(int, p["final_score"]) for p in completed)
-    assert state["total_score"] == expected_total
-
-
-def test_stuck_45s_skips_pose_with_score_0(
-    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
-) -> None:
-    exp, clock = exp_with_clock
-    clock.advance(2.1)
-    exp.on_vision_frame(_make_empty_frame())  # → POSING pose 0
-
-    # 45.1s không match → skip
-    clock.advance(45.1)
-    exp.on_vision_frame(_make_empty_frame())
-    state = exp.render_state()
-    completed = cast(list[dict[str, Any]], state["completed_poses"])
-    assert len(completed) == 1
-    assert completed[0]["skipped"] is True
-    assert completed[0]["final_score"] == 0
-
-
-def test_show_hint_true_at_15s(
-    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
-) -> None:
-    exp, clock = exp_with_clock
-    clock.advance(2.1)
-    exp.on_vision_frame(_make_empty_frame())  # → POSING pose 0
-
-    # Trước 15s: show_hint False
-    clock.advance(10.0)
-    exp.on_vision_frame(_make_empty_frame())
-    assert exp.render_state()["show_hint"] is False
-    # Sau 15s: show_hint True (16s in pose)
-    clock.advance(6.0)
-    exp.on_vision_frame(_make_empty_frame())
-    assert exp.render_state()["show_hint"] is True
-
-
-def test_result_transitions_to_done_after_3s(
-    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
-) -> None:
-    exp, clock = exp_with_clock
-    clock.advance(2.1)
-    exp.on_vision_frame(_make_empty_frame())  # → POSING
-
-    # Skip all 5 poses
-    for _ in range(5):
-        clock.advance(45.1)
-        exp.on_vision_frame(_make_empty_frame())
-    assert exp.render_state()["phase"] == Phase.RESULT.value
-
-    # Sau 3s → DONE
-    clock.advance(3.1)
-    exp.on_vision_frame(_make_empty_frame())
-    assert exp.render_state()["phase"] == Phase.DONE.value
-
-
-def test_render_state_schema_complete(
-    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
-) -> None:
-    exp, _ = exp_with_clock
-    state = exp.render_state()
-    expected_keys = {
-        "phase", "elapsed_in_phase",
-        "pose_index", "pose_count", "current_pose",
-        "score", "max_score_in_attempt", "match_threshold",
-        "hold_progress", "hold_required",
-        "elapsed_in_pose", "show_hint", "stuck_skip_at",
-        "completed_poses", "total_score", "best_pose_id",
-        "pose_landmarks_present",
-    }
-    assert set(state.keys()) == expected_keys
-
-
-def test_best_pose_id_is_max_score(
-    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
-) -> None:
-    exp, clock = exp_with_clock
-    clock.advance(2.1)
-    exp.on_vision_frame(_make_empty_frame())  # POSING pose 0
-
-    # Complete pose 0 với T-pose hold 4s
-    for _ in range(8):
-        clock.advance(0.5)
-        exp.on_vision_frame(_make_pose_frame())
-    # Skip pose 1
-    clock.advance(45.1)
-    exp.on_vision_frame(_make_empty_frame())
-    state = exp.render_state()
-    # Best = T_POSE (chỉ pose đó có final_score > 0)
-    assert state["best_pose_id"] == "T_POSE"
-
-
-def test_completion_summary_after_game_end(
-    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
-) -> None:
-    exp, clock = exp_with_clock
-    clock.advance(2.1)
-    exp.on_vision_frame(_make_empty_frame())  # POSING
-
-    # Complete pose 0 với T-pose
-    for _ in range(8):
-        clock.advance(0.5)
-        exp.on_vision_frame(_make_pose_frame())
-    # Skip remaining 4 poses
-    for _ in range(4):
-        clock.advance(45.1)
-        exp.on_vision_frame(_make_empty_frame())
-    summary = exp.completion_summary()
-    assert summary["completed"] is True
-    assert cast(int, summary["score"]) > 0
-    assert summary["poses_completed"] == 5
