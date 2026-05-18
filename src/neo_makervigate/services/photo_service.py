@@ -16,10 +16,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import cv2
+import numpy as np
 from loguru import logger
 
+from neo_makervigate.core import photo_capture as _photo_capture_mod
 from neo_makervigate.core.models import PhotoResult
-from neo_makervigate.core.photo_capture import DEFAULT_PHOTOS_DIR, PhotoCapture
+from neo_makervigate.core.photo_capture import DEFAULT_PHOTOS_DIR, PhotoCapture, list_source_photos
 from neo_makervigate.utils.signal_bus import SignalBus
 from neo_makervigate.utils.storage import cleanup_if_over_limit
 
@@ -79,6 +82,25 @@ class PhotoService:
                         logger.warning(f"Composite failed, falling back to original: {e}")
                 else:
                     logger.warning("background_path provided but no selfie_mask available")
+
+            # P7c: Source photo fallback if live composite not available
+            if composite_path is None and bg_path_str:
+                import random
+                source_photos = list_source_photos(
+                    source_dir=_photo_capture_mod.DEFAULT_SOURCE_PHOTOS_DIR
+                )
+                if source_photos:
+                    source_pick = random.choice(source_photos)
+                    try:
+                        source_frame = cv2.imread(str(source_pick))
+                        if source_frame is not None:
+                            mask = np.ones(source_frame.shape[:2], dtype=np.float32)
+                            composite_path = self._capture.save_composite(
+                                source_frame, mask, Path(str(bg_path_str)), photo_dir,
+                            )
+                            logger.info(f"Source photo fallback: {source_pick.name}")
+                    except Exception as e:
+                        logger.warning(f"Source photo fallback failed: {e}")
 
             filename = "composite.jpg" if composite_path is not None else "original.jpg"
             url = self._share.make_share_url(photo_id, filename=filename)

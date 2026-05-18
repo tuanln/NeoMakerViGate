@@ -232,3 +232,101 @@ def test_capture_without_background_skips_composite(
     assert results[0].composite_path is None
     assert results[0].download_url is not None
     assert "original.jpg" in results[0].download_url
+
+
+def test_capture_fallback_to_source_when_no_selfie_mask(
+    tmp_path: Path,
+    share_setup: tuple[ShareServer, ShareService],
+    qapp,
+    monkeypatch,
+) -> None:
+    """Background provided but no selfie_mask → fallback to source photo."""
+    from datetime import datetime
+
+    import cv2
+
+    from neo_makervigate.core.models import VisionFrame
+
+    _, share = share_setup
+    fg = np.zeros((360, 640, 3), dtype=np.uint8)
+    fg[:, :, 1] = 200
+    # VF without selfie_mask
+    vf = VisionFrame(timestamp=datetime.now(), width=640, height=360, selfie_mask=None)
+    worker = _FakeWorkerWithVf(frame=fg, vf=vf)
+
+    # Set up source_photos in tmp_path + monkeypatch DEFAULT
+    source_dir = tmp_path / "source_photos_test"
+    source_dir.mkdir()
+    source_img = source_dir / "child_01.jpg"
+    bg_color = np.zeros((360, 640, 3), dtype=np.uint8)
+    bg_color[:, :, 2] = 255  # red source
+    cv2.imwrite(str(source_img), bg_color)
+    monkeypatch.setattr(
+        "neo_makervigate.core.photo_capture.DEFAULT_SOURCE_PHOTOS_DIR", source_dir
+    )
+
+    bg_path = tmp_path / "bg.png"
+    bg = np.zeros((360, 640, 3), dtype=np.uint8)
+    bg[:, :, 0] = 255  # blue bg
+    cv2.imwrite(str(bg_path), bg)
+
+    _ = PhotoService(worker=worker, share=share, photos_base=tmp_path)  # type: ignore[arg-type]
+
+    results: list[PhotoResult] = []
+    SignalBus.instance().photo_captured.connect(lambda r: results.append(r))
+    SignalBus.instance().photo_capture_requested.emit({
+        "experience_id": "exp06_photo_booth",
+        "background_path": str(bg_path),
+    })
+    qapp.processEvents()
+    assert len(results) == 1
+    r = results[0]
+    assert r.success is True
+    assert r.composite_path is not None, "Expected composite from source fallback"
+    assert r.composite_path.exists()
+    # URL points to composite (source-fallback path)
+    assert r.download_url is not None
+    assert "composite.jpg" in r.download_url
+
+
+def test_capture_no_source_no_mask_returns_original_only(
+    tmp_path: Path,
+    share_setup: tuple[ShareServer, ShareService],
+    qapp,
+    monkeypatch,
+) -> None:
+    """Background provided, no selfie_mask, no source photos → composite_path None."""
+    from datetime import datetime
+
+    import cv2
+
+    from neo_makervigate.core.models import VisionFrame
+
+    _, share = share_setup
+    fg = np.zeros((360, 640, 3), dtype=np.uint8)
+    vf = VisionFrame(timestamp=datetime.now(), width=640, height=360, selfie_mask=None)
+    worker = _FakeWorkerWithVf(frame=fg, vf=vf)
+
+    # Source dir empty
+    empty_source = tmp_path / "empty_source"
+    empty_source.mkdir()
+    monkeypatch.setattr(
+        "neo_makervigate.core.photo_capture.DEFAULT_SOURCE_PHOTOS_DIR", empty_source
+    )
+
+    bg_path = tmp_path / "bg.png"
+    bg = np.zeros((360, 640, 3), dtype=np.uint8)
+    cv2.imwrite(str(bg_path), bg)
+
+    _ = PhotoService(worker=worker, share=share, photos_base=tmp_path)  # type: ignore[arg-type]
+
+    results: list[PhotoResult] = []
+    SignalBus.instance().photo_captured.connect(lambda r: results.append(r))
+    SignalBus.instance().photo_capture_requested.emit({
+        "experience_id": "exp06_photo_booth",
+        "background_path": str(bg_path),
+    })
+    qapp.processEvents()
+    r = results[0]
+    assert r.composite_path is None
+    assert "original.jpg" in r.download_url  # falls back to original
