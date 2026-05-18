@@ -172,3 +172,73 @@ def test_photo_caption_ready_ignored_for_different_photo_id(qapp) -> None:
     SignalBus.instance().photo_caption_ready.emit("photo_other", "wrong caption")
     qapp.processEvents()
     assert ctrl.photoResult["caption"] == ""
+
+
+def test_idle_timeout_emits_after_90s_when_hub(qapp, monkeypatch) -> None:
+    """When status=hub AND 90s elapsed → idleTimeoutTriggered signal."""
+    import time as time_mod
+
+    from neo_makervigate.services.app_controller import AppController
+
+    fake_now = [1000.0]
+
+    def fake_perf_counter() -> float:
+        return fake_now[0]
+
+    monkeypatch.setattr(time_mod, "perf_counter", fake_perf_counter)
+    ctrl = AppController(experience_manager=None)
+    ctrl._status = "hub"  # force into Hub state
+    ctrl._last_interaction_at = fake_now[0]
+
+    fired: list[bool] = []
+    ctrl.idleTimeoutTriggered.connect(lambda: fired.append(True))
+
+    # Advance time 91s
+    fake_now[0] += 91.0
+    ctrl._check_idle()
+    assert fired == [True]
+
+
+def test_idle_timeout_does_not_fire_during_playing(qapp, monkeypatch) -> None:
+    """When status=playing → idle doesn't fire even after 90s+."""
+    import time as time_mod
+
+    from neo_makervigate.services.app_controller import AppController
+
+    fake_now = [1000.0]
+    monkeypatch.setattr(time_mod, "perf_counter", lambda: fake_now[0])
+    ctrl = AppController(experience_manager=None)
+    ctrl._status = "playing"
+    ctrl._last_interaction_at = fake_now[0]
+
+    fired: list[bool] = []
+    ctrl.idleTimeoutTriggered.connect(lambda: fired.append(True))
+
+    fake_now[0] += 120.0
+    ctrl._check_idle()
+    assert fired == []
+
+
+def test_touch_interaction_resets_idle_timer(qapp, monkeypatch) -> None:
+    """touchEvent() resets _last_interaction_at to current time."""
+    import time as time_mod
+
+    from neo_makervigate.services.app_controller import AppController
+
+    fake_now = [1000.0]
+    monkeypatch.setattr(time_mod, "perf_counter", lambda: fake_now[0])
+    ctrl = AppController(experience_manager=None)
+    ctrl._status = "hub"
+    ctrl._last_interaction_at = fake_now[0]
+
+    # Advance 50s, then touch
+    fake_now[0] += 50.0
+    ctrl.touchEvent()
+    assert ctrl._last_interaction_at == fake_now[0]
+
+    # Advance another 50s (100s total) but touch was at 50s mark — only 50s since
+    fake_now[0] += 50.0
+    fired: list[bool] = []
+    ctrl.idleTimeoutTriggered.connect(lambda: fired.append(True))
+    ctrl._check_idle()
+    assert fired == []  # Not yet 90s since touch

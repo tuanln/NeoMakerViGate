@@ -26,6 +26,9 @@ from PyQt6.QtCore import (  # type: ignore[attr-defined]
 
 from neo_makervigate.utils.signal_bus import SignalBus
 
+IDLE_TIMEOUT_SEC = 90.0
+IDLE_CHECK_INTERVAL_MS = 1000  # 1Hz
+
 if TYPE_CHECKING:
     from neo_makervigate.core.models import VisionFrame
     from neo_makervigate.services.experience_manager import ExperienceManager
@@ -46,6 +49,8 @@ class AppController(QObject):
     experienceStateChanged = pyqtSignal()
     photoResultChanged = pyqtSignal()
     photoReviewRequested = pyqtSignal()
+    idleTimeoutTriggered = pyqtSignal()
+    idleWakeRequested = pyqtSignal()
 
     def __init__(self, experience_manager: ExperienceManager | None = None) -> None:
         super().__init__()
@@ -80,6 +85,15 @@ class AppController(QObject):
         bus.experience_ended.connect(self._on_experience_ended)
         bus.photo_captured.connect(self._on_photo_captured)
         bus.photo_caption_ready.connect(self._on_photo_caption_ready)
+
+        self._last_interaction_at: float = time.perf_counter()
+        self._idle_timer = QTimer(self)
+        self._idle_timer.setInterval(IDLE_CHECK_INTERVAL_MS)
+        self._idle_timer.timeout.connect(self._check_idle)
+        self._idle_timer.start()
+        bus.gesture_detected.connect(self._touch_interaction)
+        bus.experience_started.connect(self._touch_interaction)
+        bus.photo_capture_requested.connect(self._touch_interaction)
 
     # ---- Properties exposed to QML ----
 
@@ -235,6 +249,29 @@ class AppController(QObject):
         self._photo_result = dict(self._photo_result)
         self._photo_result["caption"] = caption
         self.photoResultChanged.emit()
+
+    def _touch_interaction(self, *args: object) -> None:
+        """Mark interaction — reset idle timer. args ignored (signals pass varying types)."""
+        self._last_interaction_at = time.perf_counter()
+
+    @pyqtSlot()
+    def touchEvent(self) -> None:
+        """Called from QML when user taps anywhere."""
+        self._touch_interaction()
+
+    @pyqtSlot()
+    def wakeFromIdle(self) -> None:
+        """Called from IdleAttractScreen when wake gesture detected."""
+        self._touch_interaction()
+        self.idleWakeRequested.emit()
+
+    def _check_idle(self) -> None:
+        if self._status != "hub":
+            return
+        elapsed = time.perf_counter() - self._last_interaction_at
+        if elapsed >= IDLE_TIMEOUT_SEC:
+            self._last_interaction_at = time.perf_counter()  # debounce
+            self.idleTimeoutTriggered.emit()
 
     @pyqtSlot(object)
     def _on_vision_frame(self, frame: VisionFrame) -> None:
