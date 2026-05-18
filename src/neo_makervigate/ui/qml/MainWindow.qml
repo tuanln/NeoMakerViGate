@@ -52,10 +52,25 @@ ApplicationWindow {
         }
     }
 
+    Component {
+        id: idleAttractComponent
+        IdleAttractScreen {
+            onWakeRequested: {
+                app.wakeFromIdle()
+                stack.pop()
+            }
+        }
+    }
+
     Connections {
         target: app
         function onPhotoReviewRequested() {
             stack.push(photoReviewComponent)
+        }
+        function onIdleTimeoutTriggered() {
+            if (stack.depth > 0) {
+                stack.push(idleAttractComponent)
+            }
         }
     }
 }
