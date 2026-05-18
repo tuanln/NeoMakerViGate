@@ -41,7 +41,7 @@ _MODEL_URLS: dict[str, str] = {
         "face_landmarker/float16/latest/face_landmarker.task"
     ),
     "selfie": (
-        "https://storage.googleapis.com/mediapipe-models/selfie_segmenter/"
+        "https://storage.googleapis.com/mediapipe-models/image_segmenter/"
         "selfie_segmenter/float16/latest/selfie_segmenter.tflite"
     ),
 }
