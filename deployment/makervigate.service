@@ -1,0 +1,31 @@
+[Unit]
+Description=NeoMakerViGate Cổng Vào Làng Maker
+After=multi-user.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%USER%
+Group=%USER%
+WorkingDirectory=%HOME%/NeoMakerViGate
+
+# Qt eglfs — fullscreen direct framebuffer, no X11/Wayland
+Environment=QT_QPA_PLATFORM=eglfs
+Environment=QT_QPA_EGLFS_KMS_ATOMIC=1
+Environment=QT_QPA_EGLFS_HIDECURSOR=1
+Environment=PYTHONUNBUFFERED=1
+Environment=QT_LOGGING_RULES=qt.qpa.fonts.debug=false
+
+ExecStart=%HOME%/NeoMakerViGate/.venv/bin/python -m neo_makervigate
+Restart=on-failure
+RestartSec=5
+
+StandardOutput=journal
+StandardError=journal
+
+# Crash recovery: nếu crash 5 lần trong 60s → ngưng (manual restart)
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target

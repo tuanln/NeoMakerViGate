@@ -1,0 +1,16 @@
+# udev rule cho NeoMakerViGate webcam
+# Symlink /dev/makervigate-cam tới UVC webcam.
+# Match common Logitech webcams; clone dòng để thêm vendor:product khác.
+
+# Logitech C270 (046d:0825)
+SUBSYSTEM=="video4linux", KERNEL=="video[0-9]*", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="0825", SYMLINK+="makervigate-cam", GROUP="video", MODE="0664"
+
+# Logitech C310 (046d:081b)
+SUBSYSTEM=="video4linux", KERNEL=="video[0-9]*", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="081b", SYMLINK+="makervigate-cam", GROUP="video", MODE="0664"
+
+# Logitech C920 (046d:082d)
+SUBSYSTEM=="video4linux", KERNEL=="video[0-9]*", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="082d", SYMLINK+="makervigate-cam", GROUP="video", MODE="0664"
+
+# Fallback: ANY UVC class device (bị comment vì có thể conflict với webcam tích hợp)
+# Uncomment dòng dưới nếu dùng webcam khác Logitech:
+# SUBSYSTEM=="video4linux", KERNEL=="video[0-9]*", ATTRS{bInterfaceClass}=="0e", SYMLINK+="makervigate-cam", GROUP="video", MODE="0664"
