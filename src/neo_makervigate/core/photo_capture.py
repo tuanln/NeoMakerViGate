@@ -14,7 +14,25 @@ import cv2
 import numpy as np
 
 DEFAULT_PHOTOS_DIR = Path.home() / "makervigate" / "photos"
+DEFAULT_SOURCE_PHOTOS_DIR = Path.home() / "makervigate" / "source_photos"
 JPG_QUALITY = 90
+
+
+def list_source_photos(source_dir: Path = DEFAULT_SOURCE_PHOTOS_DIR) -> list[Path]:
+    """Liệt kê file .jpg/.png trong source_photos/. Empty list nếu không có.
+
+    Admin upload pre-prepared photos vào folder này via scp. PhotoService
+    sẽ fallback random pick nếu live composite không sẵn (no selfie_mask).
+    """
+    if not source_dir.exists():
+        return []
+    return sorted(
+        [
+            p
+            for p in source_dir.iterdir()
+            if p.is_file() and p.suffix.lower() in (".jpg", ".jpeg", ".png")
+        ]
+    )
 
 
 class PhotoCapture:

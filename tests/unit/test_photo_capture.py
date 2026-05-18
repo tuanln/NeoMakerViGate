@@ -131,3 +131,27 @@ def test_save_composite_writes_jpg(tmp_path: Path) -> None:
     with open(path, "rb") as f:
         header = f.read(3)
     assert header[:3] == b"\xff\xd8\xff"
+
+
+def test_list_source_photos_empty_when_dir_missing(tmp_path: Path) -> None:
+    from neo_makervigate.core.photo_capture import list_source_photos
+    result = list_source_photos(tmp_path / "nonexistent")
+    assert result == []
+
+
+def test_list_source_photos_returns_jpg_png(tmp_path: Path) -> None:
+    from neo_makervigate.core.photo_capture import list_source_photos
+    (tmp_path / "a.jpg").write_bytes(b"\xff\xd8\xff")
+    (tmp_path / "b.png").write_bytes(b"\x89PNG\r\n")
+    (tmp_path / "c.txt").write_text("not image")
+    result = list_source_photos(tmp_path)
+    names = sorted(p.name for p in result)
+    assert names == ["a.jpg", "b.png"]
+
+
+def test_list_source_photos_sorted(tmp_path: Path) -> None:
+    from neo_makervigate.core.photo_capture import list_source_photos
+    for n in ("zebra.jpg", "apple.jpg", "mango.png"):
+        (tmp_path / n).write_bytes(b"\xff\xd8\xff")
+    result = list_source_photos(tmp_path)
+    assert [p.name for p in result] == ["apple.jpg", "mango.png", "zebra.jpg"]
