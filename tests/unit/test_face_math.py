@@ -4,16 +4,16 @@ from __future__ import annotations
 
 from neo_makervigate.core.models import Landmark
 from neo_makervigate.utils.face_math import (
-    LIP_BOTTOM,
-    LIP_LEFT,
-    LIP_RIGHT,
-    LIP_TOP,
     LEFT_BROW_INNER,
     LEFT_EYE_BOTTOM,
     LEFT_EYE_INNER,
     LEFT_EYE_OUTER,
     LEFT_EYE_TOP,
     LEFT_TEMPLE,
+    LIP_BOTTOM,
+    LIP_LEFT,
+    LIP_RIGHT,
+    LIP_TOP,
     NOSE_TIP,
     RIGHT_BROW_INNER,
     RIGHT_EYE_BOTTOM,
