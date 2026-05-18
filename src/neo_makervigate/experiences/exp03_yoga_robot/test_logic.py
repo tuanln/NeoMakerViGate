@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from datetime import datetime
-from typing import Any, cast  # noqa: F401  -- re-used in T7+ detector tests
+from typing import Any, cast
 
 import pytest
 
@@ -183,3 +183,44 @@ def test_intro_transitions_to_posing_after_2s(
     clock.advance(2.1)
     exp.on_vision_frame(_make_empty_frame())
     assert exp.render_state()["phase"] == Phase.POSING.value
+
+
+def test_smile_pose_match_advances_after_hold(
+    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
+) -> None:
+    """Smile face frames → hold 2s → advance to mouth_open."""
+    exp, clock = exp_with_clock
+    # Skip INTRO
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_empty_frame())  # → POSING (smile is pose 0)
+    # Send smile frames for ~2.4s (0.2s steps so gap <= MATCH_GAP_TOLERANCE=0.3)
+    for _ in range(13):
+        clock.advance(0.2)
+        exp.on_vision_frame(_make_face_frame("smile"))
+    state = exp.render_state()
+    # After hold, pose_index advances to 1 (mouth_open)
+    assert state["pose_index"] == 1
+    completed = cast(list[dict[str, Any]], state["completed_poses"])
+    assert len(completed) == 1
+    assert completed[0]["id"] == "CUOI_TO"
+
+
+def test_mouth_open_pose_match(
+    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
+) -> None:
+    """Skip to mouth_open pose (index 1), match → advance."""
+    exp, clock = exp_with_clock
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_empty_frame())  # → POSING smile
+    # Complete smile via hold (0.2s steps to stay within MATCH_GAP_TOLERANCE)
+    for _ in range(13):
+        clock.advance(0.2)
+        exp.on_vision_frame(_make_face_frame("smile"))
+    # Now on mouth_open
+    assert exp.render_state()["pose_index"] == 1
+    # Send open mouth frames (0.2s steps)
+    for _ in range(13):
+        clock.advance(0.2)
+        exp.on_vision_frame(_make_face_frame("mouth_open"))
+    # Advanced to wink (index 2)
+    assert exp.render_state()["pose_index"] == 2
