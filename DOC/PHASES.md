@@ -235,7 +235,17 @@ User chốt skip pre-flight; plan executed assuming Qwen 2.5-VL-2B works trên M
 
 ---
 
-## P7 — ARM Deploy + Smoke Test (tuần 8)
+## P7 — ARM Deploy + Smoke Test (tuần 8) — 🟡 P7a prep DONE, P7b hardware pending
+
+**P7a Achievement (2026-05-18):** Hardware-independent prep complete. AppController idle detection (90s timeout, touch + Hand wake, 3 tests). IdleAttractScreen.qml (logo + animated pulsing dot). MainWindow idle Component + Connections. deployment/install-armbian.sh (apt + venv + pip + udev + systemd setup, shellcheck clean). deployment/download-models.sh (MediaPipe + Qwen optional). deployment/makervigate.service (Qt eglfs fullscreen kiosk). deployment/udev/99-makervigate-cam.rules (Logitech symlink C270/C310/C920). DOC/DEPLOY_NEO_ONE.md rewrite từ skeleton (155 lines: hardware + pre-install + 6-step install + verify table 9 rows + 5 troubleshoot). DOC/TEACHER_MANUAL.md cheatsheet Thợ Cả vận hành FPT Shop. 8 tasks TDD. 144 tests pass, ruff/mypy strict clean. **Bug fix dọc đường:** selfie segmenter URL P1 sai path (404 lúc load exp06) — sửa `selfie_segmenter/selfie_segmenter/` → `image_segmenter/selfie_segmenter/` per MediaPipe task type convention.
+
+**P7b pending (NEO One hardware về):**
+- Spike S3 FPS measurement (≥10 fps Hands)
+- Spike S4 RAM profile (<1.8GB peak exp06)
+- 20-game smoke không crash
+- Real Logitech udev symlink verify
+- Boot time < 25s
+- Qt eglfs verify (fallback linuxfb nếu fail)
 
 **Mục tiêu:** Chạy thật trên NEO One. Đo metrics. Bug fix critical.
 
