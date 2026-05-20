@@ -224,3 +224,46 @@ def test_mouth_open_pose_match(
         exp.on_vision_frame(_make_face_frame("mouth_open"))
     # Advanced to wink (index 2)
     assert exp.render_state()["pose_index"] == 2
+
+
+def test_wink_pose_match(
+    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
+) -> None:
+    """Skip smile + mouth_open via match, then wink → advance."""
+    exp, clock = exp_with_clock
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_empty_frame())  # → POSING smile
+    # Complete smile (13 × 0.2s = 2.6s)
+    for _ in range(13):
+        clock.advance(0.2)
+        exp.on_vision_frame(_make_face_frame("smile"))
+    # Complete mouth_open
+    for _ in range(13):
+        clock.advance(0.2)
+        exp.on_vision_frame(_make_face_frame("mouth_open"))
+    # Now on wink (index 2)
+    assert exp.render_state()["pose_index"] == 2
+    # Send wink frames
+    for _ in range(13):
+        clock.advance(0.2)
+        exp.on_vision_frame(_make_face_frame("wink_left"))
+    assert exp.render_state()["pose_index"] == 3
+
+
+def test_brow_raised_pose_match(
+    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
+) -> None:
+    """Skip 3 poses via stuck-skip (neutral face), then brow_up → advance from brow_raised."""
+    exp, clock = exp_with_clock
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_empty_frame())  # → POSING smile
+    # Skip 3 poses via stuck-skip: send a neutral face frame after 45.1s each
+    for _ in range(3):
+        clock.advance(45.1)
+        exp.on_vision_frame(_make_face_frame("neutral"))
+    assert exp.render_state()["pose_index"] == 3
+    # Send brow_up frames
+    for _ in range(13):
+        clock.advance(0.2)
+        exp.on_vision_frame(_make_face_frame("brow_up"))
+    assert exp.render_state()["pose_index"] == 4
