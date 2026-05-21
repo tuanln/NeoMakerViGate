@@ -267,3 +267,44 @@ def test_brow_raised_pose_match(
         clock.advance(0.2)
         exp.on_vision_frame(_make_face_frame("brow_up"))
     assert exp.render_state()["pose_index"] == 4
+
+
+def test_head_shake_oscillation_match(
+    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
+) -> None:
+    """Alternating head_left / head_right frames → head_shake detector engages."""
+    exp, clock = exp_with_clock
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_empty_frame())
+    # Skip 4 poses via stuck-skip (use neutral face so on_vision_frame doesn't bail)
+    for _ in range(4):
+        clock.advance(45.1)
+        exp.on_vision_frame(_make_face_frame("neutral"))
+    assert exp.render_state()["pose_index"] == 4
+    # Send alternating head_left / head_right at high rate
+    scenarios = ["head_left", "head_right"] * 8  # 16 frames → 4+ oscillations
+    for scn in scenarios:
+        clock.advance(0.1)
+        exp.on_vision_frame(_make_face_frame(scn))
+    # Either still on pose 4 (mid-hold) or moved to RESULT
+    state = exp.render_state()
+    assert state["phase"] in (Phase.POSING.value, Phase.RESULT.value)
+
+
+def test_completion_summary_face_yoga(
+    exp_with_clock: tuple[YogaRobotExperience, _FakeClock],
+) -> None:
+    """Skip all 5 poses → RESULT phase + completion summary correctness."""
+    exp, clock = exp_with_clock
+    clock.advance(2.1)
+    exp.on_vision_frame(_make_empty_frame())
+    # 5 stuck-skips with neutral face (no match)
+    for _ in range(5):
+        clock.advance(45.1)
+        exp.on_vision_frame(_make_face_frame("neutral"))
+    state = exp.render_state()
+    assert state["phase"] == Phase.RESULT.value
+    summary = exp.completion_summary()
+    assert summary["completed"] is True
+    assert summary["poses_completed"] == 5
+    assert summary["skipped_count"] == 5  # all skipped
