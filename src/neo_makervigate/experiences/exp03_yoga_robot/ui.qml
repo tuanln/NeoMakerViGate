@@ -21,6 +21,7 @@ Item {
     readonly property string bestPoseId: state && state.best_pose_id ? state.best_pose_id : ""
     readonly property int poseCount: state && state.pose_count !== undefined ? state.pose_count : 5
     readonly property int poseIndex: state && state.pose_index !== undefined ? state.pose_index : 0
+    readonly property int maxScoreInAttempt: state && state.max_score_in_attempt !== undefined ? state.max_score_in_attempt : 0
 
     // Camera mirror background
     Image {
@@ -141,8 +142,10 @@ Item {
                 Layout.fillHeight: true
                 Text {
                     anchors.centerIn: parent
+                    // P7d: dùng max_score (monotonic per attempt) thay vì current
+                    // score để emoji không flicker khi score borderline oscillate.
                     text: {
-                        const s = root.score
+                        const s = root.maxScoreInAttempt
                         if (s >= root.matchThreshold) return "😄"
                         if (s >= 40) return "🙂"
                         return "😐"
@@ -170,7 +173,7 @@ Item {
                             width: Math.min(1, root.holdProgress / root.holdRequired) * (parent.width - 8)
                             radius: 12
                             color: (root.holdProgress / root.holdRequired) > 0.66 ? "#FFC77B2C" : "#FF5C8A3A"
-                            Behavior on width { NumberAnimation { duration: 50 } }
+                            Behavior on width { NumberAnimation { duration: 150 } }
                         }
                     }
                     Text {

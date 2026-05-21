@@ -48,6 +48,10 @@ SKIP_AFTER_SEC = 45.0
 # Head shake tracking
 YAW_HISTORY_MAXLEN = 60  # ~2s @ 30fps
 
+# P7d: EMA smoothing factor for displayed score (giảm flicker HUD).
+# Match logic (matched bool) vẫn dùng raw — chỉ display score được smooth.
+SCORE_EMA_ALPHA = 0.3
+
 
 class Phase(StrEnum):
     INTRO = "intro"
@@ -123,6 +127,7 @@ class YogaRobotExperience(BaseExperience):
         self._attempts: list[PoseAttempt] = []
         self._last_step_at: float = 0.0
         self._current_score: int = 0
+        self._smoothed_score: float = 0.0
         self._yaw_history: deque[tuple[float, float]] = deque(maxlen=YAW_HISTORY_MAXLEN)
 
     def get_qml_path(self) -> str:
@@ -137,6 +142,7 @@ class YogaRobotExperience(BaseExperience):
         self._pose_index = 0
         self._attempts = []
         self._current_score = 0
+        self._smoothed_score = 0.0
         self._yaw_history.clear()
 
     def on_vision_frame(self, frame: VisionFrame) -> None:
@@ -153,7 +159,12 @@ class YogaRobotExperience(BaseExperience):
 
         target = self._poses[self._pose_index]
         score, matched = self._evaluate_pose(frame.face, target, now)
-        self._current_score = score
+        # P7d: smooth displayed score (EMA) — giảm HUD flicker.
+        # Match/hold logic vẫn dùng raw `matched` từ geometry.
+        self._smoothed_score = (
+            SCORE_EMA_ALPHA * score + (1 - SCORE_EMA_ALPHA) * self._smoothed_score
+        )
+        self._current_score = int(self._smoothed_score)
         if not self._attempts:
             self._last_step_at = now
             return
@@ -270,16 +281,18 @@ class YogaRobotExperience(BaseExperience):
             score = min(100, int((mar / th["mar_min"]) * 70))
             return score, matched
         if detector == "wink":
+            # P7d: asymmetric detect — chỉ cần 1 mắt hé hơn mắt kia rõ rệt.
+            # MediaPipe Face Mesh khó track eyelid khi nhắm hẳn, nên dựa
+            # vào diff giữa 2 mắt + mắt còn lại đủ mở.
             ear_l = eye_aspect_ratio(face, "left")
             ear_r = eye_aspect_ratio(face, "right")
-            left_winking = (
-                ear_l <= th["closed_eye_ear_max"] and ear_r >= th["open_eye_ear_min"]
-            )
-            right_winking = (
-                ear_r <= th["closed_eye_ear_max"] and ear_l >= th["open_eye_ear_min"]
-            )
-            matched = left_winking or right_winking
-            return (100 if matched else 30), matched
+            ear_diff = abs(ear_l - ear_r)
+            max_open = max(ear_l, ear_r)
+            diff_min = th["ear_diff_min"]
+            matched = ear_diff >= diff_min and max_open >= th["min_open_ear"]
+            # Smooth score scale: 0 ở diff=0, 80 ở threshold, 100 khi vượt rõ.
+            score = min(100, int((ear_diff / diff_min) * 80))
+            return score, matched
         if detector == "brow_raised":
             ratio = brow_raised_ratio(face)
             matched = ratio >= th["brow_raised_min"]
@@ -331,6 +344,7 @@ class YogaRobotExperience(BaseExperience):
             PoseAttempt(pose_id=self._poses[index].id, started_at=now)
         )
         self._yaw_history.clear()
+        self._smoothed_score = 0.0  # reset HUD score between poses
 
     def _advance_to_next_pose(self, now: float) -> None:
         next_index = self._pose_index + 1

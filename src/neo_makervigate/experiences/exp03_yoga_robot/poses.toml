@@ -24,8 +24,10 @@ emoji = "😉"
 subtitle = "Nhắm 1 mắt, mở 1 mắt"
 detector = "wink"
 [poses.thresholds]
-closed_eye_ear_max = 0.15
-open_eye_ear_min = 0.25
+# P7d: asymmetric detect — chỉ cần 1 mắt hé hơn mắt kia rõ rệt.
+# Không bắt buộc nhắm hẳn (MediaPipe khó track eyelid Á).
+ear_diff_min = 0.12
+min_open_ear = 0.20
 
 [[poses]]
 id = "NHUONG_MAY"
