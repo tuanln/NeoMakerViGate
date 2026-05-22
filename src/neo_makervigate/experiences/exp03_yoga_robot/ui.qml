@@ -45,41 +45,9 @@ Item {
 
     Rectangle { anchors.fill: parent; color: "#20000000" }
 
-    // Face landmark overlay — dots only (17 key points)
-    Canvas {
-        id: faceCanvas
-        anchors.fill: parent
-        renderTarget: Canvas.FramebufferObject
-
-        Connections {
-            target: app
-            function onFaceLandmarksChanged() { faceCanvas.requestPaint() }
-        }
-
-        onPaint: {
-            const ctx = faceCanvas.getContext("2d")
-            ctx.reset()
-            const face = app.faceLandmarks
-            if (!face || face.length < 386) return
-
-            ctx.fillStyle = "#C77B2C"
-            // Key landmark indices (subset)
-            const indices = [
-                1, 13, 14, 78, 308,         // nose + mouth
-                33, 133, 145, 159, 263, 362, 374, 386,  // eyes
-                55, 105, 285, 334           // brows
-            ]
-            for (let i = 0; i < indices.length; i++) {
-                const idx = indices[i]
-                if (idx >= face.length) continue
-                const px = (1 - face[idx].x) * width  // mirror x
-                const py = face[idx].y * height
-                ctx.beginPath()
-                ctx.arc(px, py, 4, 0, 2 * Math.PI)
-                ctx.fill()
-            }
-        }
-    }
+    // P7d: bỏ face landmark dots overlay — Face Mesh micro-jitter mỗi frame
+    // gây flicker rõ rệt khi user đứng yên. Face Yoga không cần dots minh hoạ,
+    // trẻ tự thấy mặt mình trong camera mirror là đủ.
 
     // Pose card top center
     Rectangle {
@@ -176,21 +144,22 @@ Item {
                             Behavior on width { NumberAnimation { duration: 150 } }
                         }
                     }
+                    // P7d: hold bar text bỏ ".toFixed(1)" liên tục → mỗi
+                    // 0.1s tick reflow gây flicker. Thay bằng "Giữ thêm Xs"
+                    // tròn số xuống integer (mỗi giây thay đổi 1 lần).
                     Text {
                         anchors.centerIn: parent
-                        text: root.holdProgress.toFixed(1) + "s / " + root.holdRequired.toFixed(1) + "s"
+                        text: {
+                            const remain = Math.max(0, Math.ceil(root.holdRequired - root.holdProgress))
+                            return remain > 0 ? "Giữ thêm " + remain + "s" : "✓"
+                        }
                         color: "white"
                         font.pixelSize: 18
                         font.bold: true
                     }
                 }
-                Text {
-                    text: "Điểm: " + root.score + "/100  (cần " + root.matchThreshold + "+)"
-                    color: "white"
-                    font.pixelSize: 22
-                    font.bold: true
-                    Layout.alignment: Qt.AlignHCenter
-                }
+                // P7d: bỏ "Điểm: X/100" text — số tick 30Hz gây flicker rõ.
+                // Emoji robot 😐→🙂→😄 đã đủ feedback trạng thái.
             }
         }
     }
